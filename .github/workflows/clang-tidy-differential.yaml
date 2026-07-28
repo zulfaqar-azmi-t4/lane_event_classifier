@@ -1,0 +1,65 @@
+name: clang-tidy-differential
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+
+jobs:
+  make-sure-label-is-present:
+    uses: autowarefoundation/autoware-github-actions/.github/workflows/make-sure-label-is-present.yaml@v1
+    with:
+      label: tag:run-build-and-test-differential
+
+  clang-tidy-differential:
+    needs: make-sure-label-is-present
+    if: ${{ needs.make-sure-label-is-present.outputs.result == 'true' }}
+    runs-on: ubuntu-24.04
+    container: ghcr.io/autowarefoundation/autoware:universe-dependencies-jazzy
+    steps:
+      - name: Set PR fetch depth
+        run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+
+      - name: Checkout PR branch and all PR commits
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: ${{ env.PR_FETCH_DEPTH }}
+
+      - name: Show machine specs
+        run: lscpu && free -h
+        shell: bash
+
+      - name: Show disk space before the tasks
+        run: df -h
+        shell: bash
+
+      - name: Remove exec_depend
+        uses: autowarefoundation/autoware-github-actions/remove-exec-depend@v1
+
+      - name: Get modified packages
+        id: get-modified-packages
+        uses: autowarefoundation/autoware-github-actions/get-modified-packages@v1
+
+      - name: Get changed files (existing files only)
+        id: get-changed-files
+        run: |
+          echo "changed-files=$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD | grep -E '\.(cpp|hpp)$' | while read -r file; do [ -e "$file" ] && echo -n "$file "; done)" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Run clang-tidy
+        if: ${{ steps.get-changed-files.outputs.changed-files != '' }}
+        uses: autowarefoundation/autoware-github-actions/clang-tidy@v1
+        with:
+          rosdistro: jazzy
+          target-packages: ${{ steps.get-modified-packages.outputs.modified-packages }}
+          clang-tidy-config-url: https://raw.githubusercontent.com/autowarefoundation/autoware/main/.clang-tidy-ci
+          clang-tidy-ignore-path: .clang-tidy-ignore
+          build-depends-repos: build_depends.repos
+
+      - name: Show disk space after the tasks
+        run: df -h
+        shell: bash
