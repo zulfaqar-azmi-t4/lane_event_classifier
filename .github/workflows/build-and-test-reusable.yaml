@@ -37,17 +37,6 @@ on:
         type: boolean
         default: false
         required: false
-      upload-coverage:
-        type: boolean
-        default: false
-        required: false
-      codecov-flag:
-        type: string
-        default: temp
-        required: false
-    secrets:
-      codecov-token:
-        required: false
 
 concurrency:
   group: ${{ inputs.concurrency-group }}
@@ -136,25 +125,11 @@ jobs:
 
       - name: Test
         if: ${{ steps.get-self-packages.outputs.self-packages != '' }}
-        id: test
         uses: autowarefoundation/autoware-github-actions/colcon-test@v1
         with:
           rosdistro: ${{ inputs.rosdistro }}
           target-packages: ${{ steps.get-self-packages.outputs.self-packages }}
           build-depends-repos: build_depends.repos
-
-      - name: Upload coverage to CodeCov
-        if: ${{ steps.test.outputs.coverage-report-files != '' && inputs.upload-coverage }}
-        uses: codecov/codecov-action@v6
-        with:
-          files: ${{ steps.test.outputs.coverage-report-files }}
-          fail_ci_if_error: false
-          verbose: true
-          flags: ${{ inputs.codecov-flag }}
-          token: ${{ secrets.codecov-token }}
-          disable_search: true
-          # Disable gcov and xcode plugins, keeping only pycoverage.
-          plugins: pycoverage
 
       - name: Show disk space after the tasks
         run: df -h

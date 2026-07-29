@@ -19,9 +19,6 @@
 # caveat: by using yq, the original formatting of the yaml files might be lost (especially line breaks)
 - repository: autowarefoundation/autoware_universe
   files:
-    # build-and-test-differential.yaml and build-test-tidy-pr.yaml are maintained locally:
-    # the universe versions carry CUDA jobs, a packages-above job, the tune-dds-network action
-    # and the combine-repos-action split of build_depends.repos, none of which apply here.
     - source: .github/workflows/clang-tidy-differential.yaml
     - source: .github/workflows/check-build-depends.yaml
     - source: .github/workflows/cppcheck-differential.yaml

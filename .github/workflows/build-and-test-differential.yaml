@@ -24,13 +24,6 @@ on:
         required: false
         default: ""
         type: string
-      upload-coverage:
-        default: false
-        required: false
-        type: boolean
-    secrets:
-      codecov-token:
-        required: false
 
 env:
   CC: /usr/lib/ccache/gcc
@@ -103,25 +96,12 @@ jobs:
         shell: bash
 
       - name: Test
-        id: test
         if: ${{ steps.get-modified-packages.outputs.modified-packages != '' }}
         uses: autowarefoundation/autoware-github-actions/colcon-test@v1
         with:
           rosdistro: ${{ inputs.rosdistro }}
           target-packages: ${{ steps.get-modified-packages.outputs.modified-packages }}
           build-depends-repos: build_depends.repos
-
-      - name: Upload coverage to CodeCov
-        if: ${{ steps.test.outputs.coverage-report-files != '' && inputs.upload-coverage }}
-        uses: codecov/codecov-action@v6
-        with:
-          files: ${{ steps.test.outputs.coverage-report-files }}
-          fail_ci_if_error: false
-          verbose: true
-          token: ${{ secrets.codecov-token }}
-          disable_search: true
-          # Disable gcov and xcode plugins, keeping only pycoverage.
-          plugins: pycoverage
 
       - name: Show disk space after the tasks
         run: df -h
