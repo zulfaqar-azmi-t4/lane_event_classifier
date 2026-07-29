@@ -1,0 +1,99 @@
+# Based on https://github.com/autowarefoundation/sync-file-templates (sources/mkdocs-base.yaml).
+# Kept locally rather than synced: the macros plugin is dropped because this repository's parameter
+# schema is a generate_parameter_library YAML file, which the json_to_markdown macro cannot read.
+
+site_name: Lane Event Classifier Documentation
+site_url: https://tier4.github.io/lane_event_classifier
+repo_url: https://github.com/tier4/lane_event_classifier
+edit_uri: https://github.com/tier4/lane_event_classifier/edit/main/
+docs_dir: .
+copyright: Copyright &copy; 2026 TIER IV, Inc.
+
+theme:
+  name: material
+  features:
+    - navigation.expand
+    - navigation.indexes
+    - navigation.instant
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.footer
+  favicon: docs/assets/images/autoware-foundation.png
+  icon:
+    logo: fontawesome/solid/car
+    repo: fontawesome/brands/github
+  language: en
+  palette:
+    - scheme: default
+      primary: white
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - scheme: slate
+      primary: grey
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
+extra:
+  font:
+    text: Roboto
+    code: Roboto Mono
+  version:
+    provider: mike
+
+extra_css:
+  - docs/assets/css/extra.css
+  - https://use.fontawesome.com/releases/v5.15.4/css/all.css
+
+extra_javascript:
+  - docs/assets/js/mathjax.js
+  - https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+plugins:
+  - awesome-pages
+  - exclude:
+      regex:
+        - ^(?!(.*/)?assets/).*\.(?!(.*\.)?md|(.*\.)?svg|(.*\.)?png|(.*\.)?gif|(.*\.)?jpg).*$
+        - ^(.*/)?[^.]*$
+  - mkdocs-video
+  - same-dir
+  # https://squidfunk.github.io/mkdocs-material/plugins/search/#config.separator
+  - search:
+      separator: '[\s\-_,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - codehilite:
+      guess_lang: false
+  - fontawesome_markdown
+  - footnotes
+  - md_in_html
+  - mdx_math
+  - mdx_truly_sane_lists:
+      nested_indent: 2
+  - plantuml_markdown:
+      server: http://www.plantuml.com/plantuml
+      format: svg
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - toc:
+      permalink: "#"
+      toc_depth: 3

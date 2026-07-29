@@ -1,0 +1,19 @@
+# Every pull request needs this label: build-test-tidy-pr.yaml gates the build on it, and this
+# repository is small enough that every change should be built.
+"run:build-and-test-differential":
+  - "**"
+"type:ci":
+  - .github/**/*
+  - "*.json"
+  - "*.yaml"
+  - "*.cfg"
+  - .clang-format
+  - .gitignore
+  - .prettierignore
+"type:documentation":
+  - docs/**/*
+  - "**/*.md"
+  - "**/*.rst"
+  - "**/*.jpg"
+  - "**/*.png"
+  - "**/*.svg"

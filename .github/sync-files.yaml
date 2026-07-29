@@ -1,36 +1,29 @@
 - repository: autowarefoundation/sync-file-templates
   source-dir: sources
   files:
-    - source: CODE_OF_CONDUCT.md
-    - source: CONTRIBUTING.md
-    - source: DISCLAIMER.md
-    # LICENSE is intentionally not synced: this repository uses the TIER IV internal-use license,
-    # while sync-file-templates ships Apache-2.0.
-    - source: .github/ISSUE_TEMPLATE/bug.yaml
-    - source: .github/ISSUE_TEMPLATE/config.yml
-    - source: .github/ISSUE_TEMPLATE/task.yaml
-    - source: .github/pull_request_template.md
-      dest: .github/PULL_REQUEST_TEMPLATE.md
-    - source: .github/stale.yml
     - source: .github/workflows/backport.yaml
-    - source: .github/workflows/build-and-test.yaml
-    - source: .github/workflows/build-and-test-differential.yaml
-    - source: .github/workflows/cancel-previous-workflows.yaml
-    - source: .github/workflows/github-release.yaml
+    - source: .github/workflows/pr-agent.yaml
     - source: .github/workflows/pre-commit.yaml
     - source: .github/workflows/pre-commit-optional.yaml
     - source: .github/workflows/semantic-pull-request.yaml
     - source: .github/workflows/spell-check-differential.yaml
-      pre-commands: |
-        sd "        with:\n" "        with:\n          local-cspell-json: .cspell.json\n" {source}
     - source: .github/workflows/sync-files.yaml
-    - source: .clang-format
-    - source: .markdown-link-check.json
     - source: .markdownlint.yaml
     - source: .pre-commit-config-optional.yaml
     - source: .pre-commit-config.yaml
-    - source: .prettierignore
-    - source: .prettierrc.yaml
     - source: .yamllint.yaml
-    - source: CPPLINT.cfg
-    - source: setup.cfg
+      pre-commands: |
+        sd "ignore: \|\n" "ignore: |\n  .github/workflows/*.yaml\n" {source}
+
+# yq is available in the sync-files workflow.
+# caveat: by using yq, the original formatting of the yaml files might be lost (especially line breaks)
+- repository: autowarefoundation/autoware_universe
+  files:
+    # build-and-test-differential.yaml and build-test-tidy-pr.yaml are maintained locally:
+    # the universe versions carry CUDA jobs, a packages-above job, the tune-dds-network action
+    # and the combine-repos-action split of build_depends.repos, none of which apply here.
+    - source: .github/workflows/clang-tidy-differential.yaml
+    - source: .github/workflows/check-build-depends.yaml
+    - source: .github/workflows/cppcheck-differential.yaml
+    - source: .github/workflows/json-schema-check.yaml
+    - source: .github/workflows/pre-commit-lite.yaml

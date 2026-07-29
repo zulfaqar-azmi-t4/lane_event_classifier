@@ -1,0 +1,42 @@
+name: build-test-tidy-pr
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - labeled
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  require-label:
+    uses: autowarefoundation/autoware-github-actions/.github/workflows/require-label.yaml@v1
+    with:
+      label: run:build-and-test-differential
+
+  build-and-test-differential:
+    if: ${{ always() }}
+    needs:
+      - require-label
+    strategy:
+      fail-fast: false
+      matrix:
+        rosdistro: [humble, jazzy]
+        include:
+          - rosdistro: humble
+            container: ghcr.io/autowarefoundation/autoware:universe-dependencies-humble
+          - rosdistro: jazzy
+            container: ghcr.io/autowarefoundation/autoware:universe-dependencies-jazzy
+
+    uses: ./.github/workflows/build-and-test-differential.yaml
+    with:
+      rosdistro: ${{ matrix.rosdistro }}
+      container: ${{ matrix.container }}
+      run-condition: ${{ needs.require-label.outputs.result == 'true' }}
+      upload-coverage: ${{ matrix.rosdistro == 'jazzy' }}
+    secrets:
+      codecov-token: ${{ secrets.CODECOV_TOKEN }}
