@@ -1,24 +1,32 @@
 name: clang-tidy-differential
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - labeled
+  workflow_call:
+    inputs:
+      container:
+        default: ghcr.io/autowarefoundation/autoware:universe-dependencies-jazzy
+        required: false
+        type: string
+      rosdistro:
+        default: jazzy
+        required: false
+        type: string
+      # Why is it a JSON string?
+      # https://github.com/orgs/community/discussions/11692#discussioncomment-3541856
+      runner:
+        default: "['ubuntu-24.04']"
+        required: false
+        type: string
+      run-condition:
+        default: true
+        required: false
+        type: boolean
 
 jobs:
-  make-sure-label-is-present:
-    uses: autowarefoundation/autoware-github-actions/.github/workflows/make-sure-label-is-present.yaml@v1
-    with:
-      label: tag:run-build-and-test-differential
-
   clang-tidy-differential:
-    needs: make-sure-label-is-present
-    if: ${{ needs.make-sure-label-is-present.outputs.result == 'true' }}
-    runs-on: ubuntu-24.04
-    container: ghcr.io/autowarefoundation/autoware:universe-dependencies-jazzy
+    if: ${{ inputs.run-condition }}
+    runs-on: ${{ fromJson(inputs.runner) }}
+    container: ${{ inputs.container }}
     steps:
       - name: Set PR fetch depth
         run: echo "PR_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
@@ -54,7 +62,7 @@ jobs:
         if: ${{ steps.get-changed-files.outputs.changed-files != '' }}
         uses: autowarefoundation/autoware-github-actions/clang-tidy@v1
         with:
-          rosdistro: jazzy
+          rosdistro: ${{ inputs.rosdistro }}
           target-packages: ${{ steps.get-modified-packages.outputs.modified-packages }}
           clang-tidy-config-url: https://raw.githubusercontent.com/autowarefoundation/autoware/main/.clang-tidy-ci
           clang-tidy-ignore-path: .clang-tidy-ignore

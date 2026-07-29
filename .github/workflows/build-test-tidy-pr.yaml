@@ -13,15 +13,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  require-label:
-    uses: autowarefoundation/autoware-github-actions/.github/workflows/require-label.yaml@v1
+  make-sure-label-is-present:
+    uses: autowarefoundation/autoware-github-actions/.github/workflows/make-sure-label-is-present.yaml@v1
     with:
       label: run:build-and-test-differential
 
   build-and-test-differential:
     if: ${{ always() }}
     needs:
-      - require-label
+      - make-sure-label-is-present
     strategy:
       fail-fast: false
       matrix:
@@ -36,4 +36,12 @@ jobs:
     with:
       rosdistro: ${{ matrix.rosdistro }}
       container: ${{ matrix.container }}
-      run-condition: ${{ needs.require-label.outputs.result == 'true' }}
+      run-condition: ${{ needs.make-sure-label-is-present.outputs.result == 'true' }}
+
+  clang-tidy-differential:
+    if: ${{ always() }}
+    needs:
+      - make-sure-label-is-present
+    uses: ./.github/workflows/clang-tidy-differential.yaml
+    with:
+      run-condition: ${{ needs.make-sure-label-is-present.outputs.result == 'true' }}
