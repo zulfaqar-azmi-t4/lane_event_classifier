@@ -81,7 +81,7 @@ void LaneEventClassifierDebug::log_warn(const std::string & message) const
 void LaneEventClassifierDebug::log_state(
   uint8_t current_state, const LaneEventInput & input,
   const LaneFollowingResult & lane_following_result, const LaneTracker & lane_tracker,
-  const std::vector<std::unique_ptr<LaneEventClassifierBase>> & classifiers)
+  const std::vector<std::unique_ptr<LaneEventClassifierBase>> & classifiers) const
 {
   const auto & ego_pos = input.odometry_ptr->pose.pose.position;
   const auto & reference_lane = lane_tracker.reference_lane();
@@ -96,15 +96,15 @@ void LaneEventClassifierDebug::log_state(
       logger_, "%s",
       fmt::format(
         "[lane_event] reference lane {} -> {} (ego now in lane {})", previous_reference_lane_id_,
-        reference_lane.reference_lane_id, lane_tracker.last_selected_lane_id())
+        reference_lane.reference_lane_id, lane_tracker.debug_last_selected_lane_id())
         .c_str());
     previous_reference_lane_id_ = reference_lane.reference_lane_id;
   }
-  if (!lane_tracker.is_reference_lane_held() && lane_tracker.is_last_reanchor_blocked()) {
+  if (!lane_tracker.is_reference_lane_held() && lane_tracker.debug_is_last_reanchor_blocked()) {
     log_warn(fmt::format(
       "[lane_event] reference lane STUCK at {} but ego is now in lane {} (not a next lane of the "
       "reference lane) -> footprint will read as a lateral departure",
-      reference_lane.reference_lane_id, lane_tracker.last_selected_lane_id()));
+      reference_lane.reference_lane_id, lane_tracker.debug_last_selected_lane_id()));
   }
 
   // Built lazily — it scans the map, so only when a log line is actually emitted.
@@ -136,9 +136,9 @@ void LaneEventClassifierDebug::log_state(
         "[lane_event] {} -> {} | ego=({:.2f}, {:.2f}) reference_lane={} on_route={} "
         "following={} ({}) | why: {} | {}",
         state_to_string(previously_published_state_), state_to_string(current_state), ego_pos.x,
-        ego_pos.y, reference_lane.reference_lane_id, reference_lane.is_reference_lane_on_route,
-        is_lane_following, following_reason, reasons.empty() ? "(none)" : reasons,
-        build_lanes_context())
+        ego_pos.y, reference_lane.reference_lane_id,
+        reference_lane.debug_is_reference_lane_on_route, is_lane_following, following_reason,
+        reasons.empty() ? "(none)" : reasons, build_lanes_context())
         .c_str());
     previously_published_state_ = current_state;
   } else if (current_state == DrivingState::LANE_FOLLOWING && ego_departed) {
@@ -154,7 +154,7 @@ void LaneEventClassifierDebug::log_state(
 
 void LaneEventClassifierDebug::publish_processing_time(
   const builtin_interfaces::msg::Time & stamp, double total_time_ms,
-  const std::vector<std::pair<std::string, double>> & section_times)
+  const std::vector<std::pair<std::string, double>> & section_times) const
 {
   autoware_internal_debug_msgs::msg::Float64Stamped processing_time_msg;
   processing_time_msg.stamp = stamp;

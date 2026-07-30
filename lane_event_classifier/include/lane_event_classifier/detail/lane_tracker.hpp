@@ -35,7 +35,13 @@ namespace lane_event_classifier
 struct ReferenceLane
 {
   lanelet::Id reference_lane_id{lanelet::InvalId};  // lane the ego was in before departure
-  bool is_reference_lane_on_route{false};  // debug only: reference lane is itself a route primitive
+  mutable bool debug_is_reference_lane_on_route{
+    false};                                     // reference lane is itself a route primitive
+  bool is_reference_lane_road_shoulder{false};  // subtype road_shoulder
+  // Carries a turn_direction attribute, i.e. lanelet2_utils::is_intersection_lanelet.
+  bool is_reference_lane_intersection{false};
+  bool is_reference_lane_left_bound_virtual{false};   // left bound is a virtual linestring
+  bool is_reference_lane_right_bound_virtual{false};  // right bound is a virtual linestring
 };
 
 /** @brief Owns the map, routing graph, and reference lane; provides generic lane queries.
@@ -64,7 +70,7 @@ public:
    * @brief Refreshes the reference lane for this cycle (unless held).
    * @param input Per-cycle subscribed inputs and footprint.
    */
-  void update(const LaneEventInput & input);
+  tl::expected<void, std::string> update(const LaneEventInput & input);
 
   void hold_reference_lane() { is_reference_lane_held_ = true; }
 
@@ -95,7 +101,6 @@ public:
   [[nodiscard]] std::optional<double> distance_to_lane(
     lanelet::Id lane_id, const lanelet::BasicPoint2d & point) const;
 
-  // Debug helpers (logging / visualisation only).
   /** @brief Ids of every lanelet that contains the given point. */
   [[nodiscard]] std::vector<lanelet::Id> lanelet_ids_at(const lanelet::BasicPoint2d & point) const;
 
@@ -129,19 +134,29 @@ public:
   }
 
   /** @brief Lanelet the ego centre was found in on the last update() (InvalId if none/held). */
-  [[nodiscard]] lanelet::Id last_selected_lane_id() const { return last_selected_lane_id_; }
+  [[nodiscard]] lanelet::Id debug_last_selected_lane_id() const
+  {
+    return debug_last_selected_lane_id_;
+  }
 
   /** @brief True when the last update() could not advance the reference lane
    * (stale/off-sequence). */
-  [[nodiscard]] bool is_last_reanchor_blocked() const { return is_last_reanchor_blocked_; }
+  [[nodiscard]] bool debug_is_last_reanchor_blocked() const
+  {
+    return debug_is_last_reanchor_blocked_;
+  }
 
 private:
   /** @brief Rebuilds route_primitive_ids_ when the route changes (keyed on route_ptr identity). */
-  void refresh_route_primitive_cache(const LaneEventInput & input);
+  std::unordered_set<lanelet::Id> update_primitive_route_ids(
+    const autoware_planning_msgs::msg::LaneletRoute::ConstSharedPtr & route_ptr) const;
 
   /** @brief Re-anchors the reference lane only on forward progress into a next lane, never on a
    * lateral move. */
-  void refresh_reference_lane(const LaneEventInput & input);
+  std::optional<lanelet::Id> new_reference_lane_id(const LaneEventInput & input) const;
+
+  /** @brief Anchors the reference lane onto the given lane and resolves its attribute flags. */
+  ReferenceLane set_reference_lane(const lanelet::ConstLanelet & new_reference_lane) const;
 
   /** @brief The lanelet the ego sits in: route primitive, else off-route lane, else nearest. */
   [[nodiscard]] std::optional<lanelet::Id> select_current_lane_id(
@@ -159,9 +174,9 @@ private:
   ReferenceLane reference_lane_{};
   bool is_reference_lane_held_{false};
 
-  // Diagnostics from the last update() (logging only).
-  lanelet::Id last_selected_lane_id_{lanelet::InvalId};
-  bool is_last_reanchor_blocked_{false};
+  // Diagnostics from the last update() (mutable: debug only, writable from const queries).
+  mutable lanelet::Id debug_last_selected_lane_id_{lanelet::InvalId};
+  mutable bool debug_is_last_reanchor_blocked_{false};
 
   // Route-primitive cache: rebuilt only when the route changes (keyed on route_ptr identity).
   autoware_planning_msgs::msg::LaneletRoute::ConstSharedPtr cached_route_ptr_;

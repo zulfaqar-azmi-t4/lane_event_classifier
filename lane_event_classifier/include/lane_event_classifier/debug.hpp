@@ -73,7 +73,7 @@ public:
   void log_state(
     uint8_t current_state, const LaneEventInput & input,
     const LaneFollowingResult & lane_following_result, const LaneTracker & lane_tracker,
-    const std::vector<std::unique_ptr<LaneEventClassifierBase>> & classifiers);
+    const std::vector<std::unique_ptr<LaneEventClassifierBase>> & classifiers) const;
 
   /**
    * @brief Publishes the processing-time value and the per-section text overlay (running max).
@@ -83,7 +83,7 @@ public:
    */
   void publish_processing_time(
     const builtin_interfaces::msg::Time & stamp, double total_time_ms,
-    const std::vector<std::pair<std::string, double>> & section_times);
+    const std::vector<std::pair<std::string, double>> & section_times) const;
 
 private:
   rclcpp::Logger logger_;
@@ -96,11 +96,12 @@ private:
     pub_processing_time_text_;
 
   // Running maximum per timed section, for the processing-time text overlay.
-  std::unordered_map<std::string, double> max_processing_time_ms_;
+  mutable std::unordered_map<std::string, double> max_processing_time_ms_;
 
-  lanelet::Id previous_reference_lane_id_{
+  mutable lanelet::Id previous_reference_lane_id_{
     lanelet::InvalId};  // last reference lane id, to log re-anchoring
-  uint8_t previously_published_state_{DrivingState::UNKNOWN};  // last state, to log transitions
+  mutable uint8_t previously_published_state_{
+    DrivingState::UNKNOWN};  // last state, to log transitions
 };
 
 }  // namespace lane_event_classifier

@@ -71,11 +71,11 @@ TEST(LaneTrackerTest, update_anchors_reference_to_route_lane)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(make_single_lane_map(lane_id)).has_value());
 
-  tracker.update(make_input({lane_id}, 5.0, 0.0, 0, 0));
+  [[maybe_unused]] const auto update_result = tracker.update(make_input({lane_id}, 5.0, 0.0, 0, 0));
 
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, lane_id);
-  EXPECT_TRUE(tracker.reference_lane().is_reference_lane_on_route);
-  EXPECT_EQ(tracker.last_selected_lane_id(), lane_id);
+  EXPECT_TRUE(tracker.reference_lane().debug_is_reference_lane_on_route);
+  EXPECT_EQ(tracker.debug_last_selected_lane_id(), lane_id);
 }
 
 TEST(LaneTrackerTest, update_anchors_off_route_lane_when_no_route_match)
@@ -85,10 +85,10 @@ TEST(LaneTrackerTest, update_anchors_off_route_lane_when_no_route_match)
   ASSERT_TRUE(tracker.set_lanelet_map(make_single_lane_map(lane_id)).has_value());
 
   // Empty route: the ego still sits inside a lane, so it becomes an off-route reference lane.
-  tracker.update(make_input({}, 5.0, 0.0, 0, 0));
+  [[maybe_unused]] const auto update_result = tracker.update(make_input({}, 5.0, 0.0, 0, 0));
 
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, lane_id);
-  EXPECT_FALSE(tracker.reference_lane().is_reference_lane_on_route);
+  EXPECT_FALSE(tracker.reference_lane().debug_is_reference_lane_on_route);
 }
 
 TEST(LaneTrackerTest, reference_reanchors_on_forward_progress)
@@ -98,14 +98,16 @@ TEST(LaneTrackerTest, reference_reanchors_on_forward_progress)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(make_next_lane_map(id_a, id_b)).has_value());
 
-  tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
   // Ego advances into lane_b, a next lane of lane_a: the reference lane follows it forward.
-  tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
+  [[maybe_unused]] const auto update_result_2 =
+    tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_b);
-  EXPECT_EQ(tracker.last_selected_lane_id(), id_b);
-  EXPECT_FALSE(tracker.is_last_reanchor_blocked());
+  EXPECT_EQ(tracker.debug_last_selected_lane_id(), id_b);
+  EXPECT_FALSE(tracker.debug_is_last_reanchor_blocked());
 }
 
 TEST(LaneTrackerTest, reference_holds_across_lateral_move)
@@ -115,15 +117,17 @@ TEST(LaneTrackerTest, reference_holds_across_lateral_move)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(make_parallel_map(id_a, id_b)).has_value());
 
-  tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
   // Ego moves sideways into the parallel lane_b (not a next lane): the reference lane must not
   // advance, and the blocked-reanchor diagnostic fires.
-  tracker.update(make_input({id_a, id_b}, 5.0, 4.0, 1, 0));
+  [[maybe_unused]] const auto update_result_2 =
+    tracker.update(make_input({id_a, id_b}, 5.0, 4.0, 1, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_a);
-  EXPECT_EQ(tracker.last_selected_lane_id(), id_b);
-  EXPECT_TRUE(tracker.is_last_reanchor_blocked());
+  EXPECT_EQ(tracker.debug_last_selected_lane_id(), id_b);
+  EXPECT_TRUE(tracker.debug_is_last_reanchor_blocked());
 }
 
 TEST(LaneTrackerTest, hold_freezes_reference_until_released)
@@ -133,20 +137,23 @@ TEST(LaneTrackerTest, hold_freezes_reference_until_released)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(make_next_lane_map(id_a, id_b)).has_value());
 
-  tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
   tracker.hold_reference_lane();
   EXPECT_TRUE(tracker.is_reference_lane_held());
 
   // While held the reference lane is frozen even as the ego advances into lane_b.
-  tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
+  [[maybe_unused]] const auto update_result_2 =
+    tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
   // Releasing clears the reference so the next update re-anchors to the ego's current lane.
   tracker.release_reference_lane();
   EXPECT_FALSE(tracker.is_reference_lane_held());
-  tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 2, 0));
+  [[maybe_unused]] const auto update_result_3 =
+    tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 2, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_b);
 }
 
@@ -239,7 +246,7 @@ TEST(LaneTrackerTest, route_primitive_cache_tracks_current_route)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(make_next_lane_map(id_a, id_b)).has_value());
 
-  tracker.update(make_input({id_a}, 5.0, 0.0, 0, 0));
+  [[maybe_unused]] const auto update_result = tracker.update(make_input({id_a}, 5.0, 0.0, 0, 0));
   EXPECT_TRUE(tracker.is_route_primitive(id_a));
   EXPECT_FALSE(tracker.is_route_primitive(id_b));
   EXPECT_NE(tracker.route_primitive_ids().count(id_a), 0u);

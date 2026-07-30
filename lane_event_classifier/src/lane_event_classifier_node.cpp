@@ -207,7 +207,9 @@ void LaneEventClassifierNode::on_trajectory(
   }
 
   stop_watch.tic("lane_tracker");
-  lane_tracker_.update(input_);
+  if (const auto res = lane_tracker_.update(input_); !res) {
+    debug_.log_reset(res.error());
+  }
   const double lane_tracker_time_ms = stop_watch.toc("lane_tracker");
 
   stop_watch.tic("lane_following");
