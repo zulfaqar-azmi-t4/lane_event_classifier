@@ -16,6 +16,7 @@
 #define LANE_EVENT_CLASSIFIER__DEBUG_HPP_
 
 #include <builtin_interfaces/msg/time.hpp>
+#include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_event_classifier_base.hpp>
 #include <lane_event_classifier/lane_following/checker.hpp>
 #include <lane_event_classifier/types.hpp>
@@ -24,6 +25,8 @@
 #include <autoware_internal_debug_msgs/msg/float64_stamped.hpp>
 #include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
+
+#include <lanelet2_core/primitives/Lanelet.h>
 
 #include <cstdint>
 #include <memory>
@@ -48,21 +51,28 @@ public:
   void publish_markers(const visualization_msgs::msg::MarkerArray & markers) const;
 
   /**
+   * @brief Logs a tracking-state reset (see reset_tracking_state) with its cause.
+   * @param reason Human-readable cause of the reset (e.g. the reposition jump or lane departure).
+   */
+  void log_reset(const std::string & reason) const;
+
+  /**
    * @brief Logs a throttled warning (e.g. a cycle skipped because an input was unavailable).
    * @param message Human-readable warning message.
    */
   void log_warn(const std::string & message) const;
 
   /**
-   * @brief Logs state transitions and accumulating departures.
+   * @brief Logs reference lane (re)anchoring, state transitions, and accumulating departures.
    * @param current_state Latest published DrivingState.
    * @param input Per-cycle input.
    * @param lane_following_result Lane-following check verdict for the cycle.
+   * @param lane_tracker Tracker, for the reference lane and lane-id diagnostics.
    * @param classifiers Active classifiers, for their debug reasons.
    */
   void log_state(
     uint8_t current_state, const LaneEventInput & input,
-    const LaneFollowingResult & lane_following_result,
+    const LaneFollowingResult & lane_following_result, const LaneTracker & lane_tracker,
     const std::vector<std::unique_ptr<LaneEventClassifierBase>> & classifiers);
 
   /**
@@ -88,6 +98,8 @@ private:
   // Running maximum per timed section, for the processing-time text overlay.
   std::unordered_map<std::string, double> max_processing_time_ms_;
 
+  lanelet::Id previous_reference_lane_id_{
+    lanelet::InvalId};  // last reference lane id, to log re-anchoring
   uint8_t previously_published_state_{DrivingState::UNKNOWN};  // last state, to log transitions
 };
 

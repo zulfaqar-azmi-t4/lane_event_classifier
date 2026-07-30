@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef LANE_EVENT_CLASSIFIER__GEOMETRY_UTILS_HPP_
-#define LANE_EVENT_CLASSIFIER__GEOMETRY_UTILS_HPP_
+#ifndef LANE_EVENT_CLASSIFIER__DETAIL__GEOMETRY_UTILS_HPP_
+#define LANE_EVENT_CLASSIFIER__DETAIL__GEOMETRY_UTILS_HPP_
 
 #include <autoware_utils_geometry/geometry.hpp>
 #include <lane_event_classifier/types.hpp>
@@ -82,4 +82,4 @@ inline bool is_virtual_linestring(const lanelet::ConstLineString3d & bound)
 
 }  // namespace lane_event_classifier
 
-#endif  // LANE_EVENT_CLASSIFIER__GEOMETRY_UTILS_HPP_
+#endif  // LANE_EVENT_CLASSIFIER__DETAIL__GEOMETRY_UTILS_HPP_
