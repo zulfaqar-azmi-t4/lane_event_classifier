@@ -16,6 +16,8 @@ ament_auto_add_library(${PROJECT_NAME}_lib SHARED
   src/debug.cpp
   src/detail/lane_tracker.cpp
   src/lane_following/checker.cpp
+  src/lane_change/geometry.cpp
+  src/lane_change/classifier.cpp
 )
 
 target_link_libraries(${PROJECT_NAME}_lib
@@ -48,6 +50,14 @@ if(BUILD_TESTING)
   target_compile_definitions(test_lane_following PRIVATE
     "TEST_MAP_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/test/map/lanelet2_map.osm\"")
   target_compile_options(test_lane_following PRIVATE -Wno-deprecated-declarations)
+
+  ament_add_ros_isolated_gtest(test_lane_change_classifier
+    test/test_lane_change_classifier.cpp
+  )
+  target_link_libraries(test_lane_change_classifier ${PROJECT_NAME}_lib)
+  target_compile_definitions(test_lane_change_classifier PRIVATE
+    "TEST_MAP_PATH=\"${CMAKE_CURRENT_SOURCE_DIR}/test/map/lanelet2_map.osm\"")
+  target_compile_options(test_lane_change_classifier PRIVATE -Wno-deprecated-declarations)
 endif()
 
 ament_auto_package(
