@@ -87,7 +87,7 @@ void LaneEventClassifierDebug::log_state(
   const auto & reference_lane = lane_tracker.reference_lane();
   const auto & [is_lane_following, lane_following_reason] = lane_following_result;
   const bool ego_departed = !is_lane_following;
-  const auto following_reason = to_string(lane_following_reason);
+  const auto following_reason = to_debug_string(lane_following_reason);
 
   // Trace reference lane (re)anchoring and the "stuck reference lane" condition (reference lane can
   // no longer follow ego).

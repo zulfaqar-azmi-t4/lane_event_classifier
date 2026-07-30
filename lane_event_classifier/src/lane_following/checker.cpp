@@ -56,8 +56,8 @@ bool is_point_within_tolerance_of_any(
   });
 }
 
-// road_shoulder_exempt: ego point overlaps a road shoulder (shoulders are excluded from the routing
-// graph).
+// road_shoulder_exempt: shoulders are excluded from the routing graph, so this is an explicit
+// check.
 bool is_point_in_road_shoulder(
   const lanelet::LaneletMapPtr & map, const lanelet::BasicPoint2d & point)
 {
@@ -70,17 +70,18 @@ bool is_point_in_road_shoulder(
   return false;
 }
 
-// turn_lane_exempt: ego is in a turn / intersection lane (the reference lane, or a sequence lane it
-// sits in).
+// turn_lane_exempt: ego is in a turn / intersection lane, either the reference lane or a sequence
+// one.
 bool is_in_turn_lane(
-  const lanelet::LaneletMapPtr & map, const lanelet::ConstLanelet & reference_lane,
+  const lanelet::LaneletMapPtr & map, const ReferenceLane & reference,
   const std::unordered_set<lanelet::Id> & sequence_ids, const lanelet::BasicPoint2d & point)
 {
-  if (lanelet2_utils::is_intersection_lanelet(reference_lane)) {
+  if (reference.is_reference_lane_intersection) {
     return true;
   }
   for (const auto id : sequence_ids) {
-    if (!map->laneletLayer.exists(id)) {
+    // The sequence contains the reference lane, whose verdict the flag above already settled.
+    if (id == reference.reference_lane_id || !map->laneletLayer.exists(id)) {
       continue;
     }
     const auto lane = map->laneletLayer.get(id);
@@ -91,11 +92,10 @@ bool is_in_turn_lane(
   return false;
 }
 
-// virtual_boundary_exempt: the boundary the ego crossed is virtual (approximated by the nearest
-// sequence boundary).
+// virtual_boundary_exempt: the crossed boundary is virtual, approximated by the nearest one.
 bool nearest_sequence_boundary_is_virtual(
   const lanelet::LaneletMapPtr & map, const std::unordered_set<lanelet::Id> & ids,
-  const lanelet::BasicPoint2d & point)
+  const ReferenceLane & reference, const lanelet::BasicPoint2d & point)
 {
   double nearest_distance = std::numeric_limits<double>::max();
   bool nearest_is_virtual = false;
@@ -104,17 +104,21 @@ bool nearest_sequence_boundary_is_virtual(
       continue;
     }
     const auto lane = map->laneletLayer.get(id);
+    // The sequence contains the reference lane, whose bounds the tracker already resolved.
+    const bool is_reference_lane = id == reference.reference_lane_id;
     const double left_distance =
       std::abs(lanelet::geometry::toArcCoordinates(lane.leftBound2d(), point).distance);
     const double right_distance =
       std::abs(lanelet::geometry::toArcCoordinates(lane.rightBound2d(), point).distance);
     if (left_distance < nearest_distance) {
       nearest_distance = left_distance;
-      nearest_is_virtual = is_virtual_linestring(lane.leftBound());
+      nearest_is_virtual = is_reference_lane ? reference.is_reference_lane_left_bound_virtual
+                                             : is_virtual_linestring(lane.leftBound());
     }
     if (right_distance < nearest_distance) {
       nearest_distance = right_distance;
-      nearest_is_virtual = is_virtual_linestring(lane.rightBound());
+      nearest_is_virtual = is_reference_lane ? reference.is_reference_lane_right_bound_virtual
+                                             : is_virtual_linestring(lane.rightBound());
     }
   }
   return nearest_is_virtual;
@@ -122,7 +126,7 @@ bool nearest_sequence_boundary_is_virtual(
 
 }  // namespace
 
-std::string_view to_string(LaneFollowingReason reason)
+std::string_view to_debug_string(LaneFollowingReason reason)
 {
   return magic_enum::enum_name(reason);
 }
@@ -146,18 +150,19 @@ const std::unordered_set<lanelet::Id> & LaneFollowingChecker::connected_sequence
 }
 
 LaneFollowingResult LaneFollowingChecker::evaluate(
-  const lanelet::LaneletMapPtr & lanelet_map_ptr,
-  const lanelet::routing::RoutingGraphConstPtr & routing_graph_ptr, lanelet::Id reference_lane_id,
-  const lanelet::BasicPoint2d & ego_point) const
+  const LaneTracker & tracker, const lanelet::BasicPoint2d & ego_point) const
 {
+  const auto & lanelet_map_ptr = tracker.lanelet_map_ptr();
+  // Attribute flags were resolved by the tracker when it anchored onto the reference lane.
+  const auto & reference = tracker.reference_lane();
+
   // no_reference_lane (docs/lane_following.md, "No reference lane").
-  if (
-    !lanelet_map_ptr || reference_lane_id == lanelet::InvalId ||
-    !lanelet_map_ptr->laneletLayer.exists(reference_lane_id)) {
+  const auto reference_lane_opt = tracker.get_lanelet(reference.reference_lane_id);
+  if (!reference_lane_opt) {
     return {true, LaneFollowingReason::no_reference_lane};
   }
-  const auto reference_lane = lanelet_map_ptr->laneletLayer.get(reference_lane_id);
-  const auto & sequence_ids = connected_sequence_ids(reference_lane, routing_graph_ptr);
+  const auto & reference_lane = *reference_lane_opt;
+  const auto & sequence_ids = connected_sequence_ids(reference_lane, tracker.routing_graph_ptr());
 
   // inside_connected_sequence (docs/lane_following.md, "Inside the connected sequence").
   if (is_point_inside_any(lanelet_map_ptr, sequence_ids, ego_point)) {
@@ -180,14 +185,14 @@ LaneFollowingResult LaneFollowingChecker::evaluate(
   // turn_lane_exempt (docs/lane_following.md, "Turn / intersection-lane exemption").
   if (
     config_.enable_turn_lane_exemption &&
-    is_in_turn_lane(lanelet_map_ptr, reference_lane, sequence_ids, ego_point)) {
+    is_in_turn_lane(lanelet_map_ptr, reference, sequence_ids, ego_point)) {
     return {true, LaneFollowingReason::turn_lane_exempt};
   }
 
   // virtual_boundary_exempt (docs/lane_following.md, "Virtual-boundary exemption").
   if (
     config_.enable_virtual_boundary_exemption &&
-    nearest_sequence_boundary_is_virtual(lanelet_map_ptr, sequence_ids, ego_point)) {
+    nearest_sequence_boundary_is_virtual(lanelet_map_ptr, sequence_ids, reference, ego_point)) {
     return {true, LaneFollowingReason::virtual_boundary_exempt};
   }
 

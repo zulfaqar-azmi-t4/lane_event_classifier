@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_FOLLOWING__CHECKER_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_FOLLOWING__CHECKER_HPP_
 
+#include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_event_classifier_parameters.hpp>
 
 #include <lanelet2_core/LaneletMap.h>
@@ -28,7 +29,7 @@ namespace lane_event_classifier
 {
 using LaneFollowingConfig = ::lane_event_classifier::Params::LaneFollowing;
 
-/** @brief Which rule decided the lane-following outcome (for tracing / logging). */
+/** @brief Which rule decided the lane-following outcome (debug tracing / logging only). */
 enum class LaneFollowingReason {
   no_reference_lane,          // no reference lane yet -> treated as following
   inside_connected_sequence,  // reference point inside a lane of the connected sequence
@@ -43,11 +44,11 @@ enum class LaneFollowingReason {
 struct LaneFollowingResult
 {
   bool is_following{true};
-  LaneFollowingReason reason{LaneFollowingReason::no_reference_lane};
+  LaneFollowingReason debug_reason{LaneFollowingReason::no_reference_lane};
 };
 
-/** @brief Returns a short label for the reason (tracing / logging). */
-[[nodiscard]] std::string_view to_string(LaneFollowingReason reason);
+/** @brief Returns a short label for the reason (debug tracing / logging only). */
+[[nodiscard]] std::string_view to_debug_string(LaneFollowingReason reason);
 
 /** @brief Runs the lane-following check and reports which rule decided the outcome. See
 docs/lane_following.md
@@ -58,17 +59,9 @@ public:
   LaneFollowingChecker() = default;
   explicit LaneFollowingChecker(LaneFollowingConfig config);
 
-  /**
-   * @brief Runs the check for the ego reference point against the reference lane.
-   * @param lanelet_map_ptr Owned lanelet map.
-   * @param routing_graph_ptr Owned routing graph.
-   * @param reference_lane_id The reference lane id.
-   * @param ego_point Ego reference point (base_link) in the map frame.
-   */
+  /** @brief Runs the check for the ego reference point against the reference lane. */
   [[nodiscard]] LaneFollowingResult evaluate(
-    const lanelet::LaneletMapPtr & lanelet_map_ptr,
-    const lanelet::routing::RoutingGraphConstPtr & routing_graph_ptr, lanelet::Id reference_lane_id,
-    const lanelet::BasicPoint2d & ego_point) const;
+    const LaneTracker & tracker, const lanelet::BasicPoint2d & ego_point) const;
 
 private:
   /**

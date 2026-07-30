@@ -36,15 +36,12 @@ namespace lane_event_classifier
 
 namespace
 {
-// Runs the lane-following check for the ego reference point against the tracker's held reference
-// lane.
+// Runs the check for the ego reference point against the tracker's reference lane.
 LaneFollowingResult check_following(
   const LaneFollowingChecker & checker, const LaneTracker & tracker,
   const lanelet::BasicPoint2d & ego_point)
 {
-  return checker.evaluate(
-    tracker.lanelet_map_ptr(), tracker.routing_graph_ptr(),
-    tracker.reference_lane().reference_lane_id, ego_point);
+  return checker.evaluate(tracker, ego_point);
 }
 
 // Departure onset is simply "not lane following" for the ego reference point.
@@ -86,9 +83,10 @@ TEST(LaneFollowingTest, next_lane_is_not_departure_lateral_is)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
-  tracker.update(test_maps::make_input({id_a, id_b}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id_a, id_b}, 5.0, 0.0, 0, test_maps::ms(0)));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
-  ASSERT_TRUE(tracker.reference_lane().is_reference_lane_on_route);
+  ASSERT_TRUE(tracker.reference_lane().debug_is_reference_lane_on_route);
   tracker
     .hold_reference_lane();  // hold the reference lane so we can probe the relation test directly
 
@@ -109,9 +107,10 @@ TEST(LaneFollowingTest, off_route_reference_lane_departs_on_lateral_exit)
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
   // Route runs down lane_b; ego sits in lane_a, which is therefore off-route.
-  tracker.update(test_maps::make_input({id_b}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id_b}, 5.0, 0.0, 0, test_maps::ms(0)));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
-  ASSERT_FALSE(tracker.reference_lane().is_reference_lane_on_route);
+  ASSERT_FALSE(tracker.reference_lane().debug_is_reference_lane_on_route);
   tracker.hold_reference_lane();
 
   LaneFollowingChecker checker;
@@ -131,9 +130,10 @@ TEST(LaneFollowingTest, off_route_forward_into_next_lane_is_not_departure)
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
   // Route runs on lane_b only, so the ego's lane (lane_a) is off-route.
-  tracker.update(test_maps::make_input({id_b}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id_b}, 5.0, 0.0, 0, test_maps::ms(0)));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
-  ASSERT_FALSE(tracker.reference_lane().is_reference_lane_on_route);
+  ASSERT_FALSE(tracker.reference_lane().debug_is_reference_lane_on_route);
   tracker.hold_reference_lane();
 
   LaneFollowingChecker checker;
@@ -152,7 +152,8 @@ TEST(LaneFollowingTest, reference_point_in_previous_lane_is_not_departure)
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
   // Ego centre in lane_b, so lane_b is the reference lane and lane_a is its previous lane.
-  tracker.update(test_maps::make_input({id_a, id_b}, 12.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id_a, id_b}, 12.0, 0.0, 0, test_maps::ms(0)));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_b);
   tracker.hold_reference_lane();
 
@@ -170,7 +171,8 @@ TEST(LaneFollowingTest, within_lateral_tolerance_is_not_departure)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
-  tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
   tracker.hold_reference_lane();
 
   LaneFollowingConfig config;
@@ -191,7 +193,8 @@ TEST(LaneFollowingTest, overlapping_road_shoulder_is_not_departure)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
-  tracker.update(test_maps::make_input({road_id}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({road_id}, 5.0, 0.0, 0, test_maps::ms(0)));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, road_id);
   tracker.hold_reference_lane();
 
@@ -213,7 +216,8 @@ TEST(LaneFollowingTest, turn_lane_out_of_lane_is_not_departure)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
-  tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
   tracker.hold_reference_lane();
 
   LaneFollowingChecker checker;                           // default: turn-lane exemption on
@@ -234,7 +238,8 @@ TEST(LaneFollowingTest, crossing_virtual_boundary_is_not_departure)
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
 
-  tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
   tracker.hold_reference_lane();
 
   LaneFollowingChecker checker;  // default: virtual-boundary exemption on
@@ -321,14 +326,14 @@ TEST(LaneFollowingMapTest, logged_false_positive_positions_are_following)
     ASSERT_FALSE(ego_lane_ids.empty()) << "ego is not inside any lanelet";
 
     tracker.release_reference_lane();
-    tracker.update(
+    [[maybe_unused]] const auto update_result = tracker.update(
       test_maps::make_input({ego_lane_ids.front()}, scenario.ego_x, scenario.ego_y, 0, 0));
     tracker.hold_reference_lane();
 
     const auto result = check_following(checker, tracker, ego);
     std::cout << "reference lane=" << tracker.reference_lane().reference_lane_id
-              << " is_following=" << result.is_following << " (" << to_string(result.reason)
-              << ")\n";
+              << " is_following=" << result.is_following << " ("
+              << to_debug_string(result.debug_reason) << ")\n";
     EXPECT_TRUE(result.is_following) << scenario.name;
   }
 }
@@ -347,7 +352,8 @@ TEST(LaneFollowingMapTest, connected_sequence_spans_multiple_hops)
   const auto point_in_47 = centerline_point(map, 47);
   const auto point_in_51 = centerline_point(map, 51);
 
-  tracker.update(test_maps::make_input({47}, point_in_47.x(), point_in_47.y(), 0, 0));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({47}, point_in_47.x(), point_in_47.y(), 0, 0));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, 47);
   tracker.hold_reference_lane();
 
@@ -379,11 +385,13 @@ TEST(LaneFollowingMapTest, off_route_parallel_corridor_is_following)
   const std::vector<lanelet::Id> route{1167, 51};
 
   // Ego in 1169 (parallel to the route's 1167).
-  tracker.update(test_maps::make_input(route, point_in_1169.x(), point_in_1169.y(), 0, 0));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input(route, point_in_1169.x(), point_in_1169.y(), 0, 0));
   EXPECT_TRUE(check_following(checker, tracker, point_in_1169).is_following);
 
   // Ego advances to 52 (parallel to the route's 51).
-  tracker.update(test_maps::make_input(route, point_in_52.x(), point_in_52.y(), 0, 0));
+  [[maybe_unused]] const auto update_result_2 =
+    tracker.update(test_maps::make_input(route, point_in_52.x(), point_in_52.y(), 0, 0));
   EXPECT_TRUE(check_following(checker, tracker, point_in_52).is_following);
 }
 
@@ -403,13 +411,14 @@ TEST(LaneFollowingMapTest, off_route_parallel_non_turn_lane_is_following)
   const auto point_in_52 = centerline_point(map, 52);
 
   // Route on 51; ego drives the parallel lane 52 (off-route).
-  tracker.update(test_maps::make_input({51}, point_in_52.x(), point_in_52.y(), 0, 0));
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({51}, point_in_52.x(), point_in_52.y(), 0, 0));
   ASSERT_EQ(
     tracker.reference_lane().reference_lane_id, 52);  // reference lane = ego's lane, not route 51
 
   const auto result = check_following(checker, tracker, point_in_52);
   EXPECT_TRUE(result.is_following);
-  EXPECT_EQ(result.reason, LaneFollowingReason::inside_connected_sequence);
+  EXPECT_EQ(result.debug_reason, LaneFollowingReason::inside_connected_sequence);
 }
 
 }  // namespace lane_event_classifier
