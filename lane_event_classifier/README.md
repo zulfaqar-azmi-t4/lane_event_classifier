@@ -138,7 +138,7 @@ cycle. Adding a classifier is: implement the interface, then register it in `bui
 | Classifier loading + aggregation   | ✅ implemented                                                         |
 | `LaneFollowingChecker`             | ✅ implemented, see [`docs/lane_following.md`](docs/lane_following.md) |
 | `LaneChangeClassifier`             | ✅ implemented, see [docs/lane_change.md](docs/lane_change.md)         |
-| `IntentionalCrossingClassifier`    | 🚧 stub, reports no event                                              |
+| `IntentionalCrossingClassifier`    | ✅ implemented, see [docs/lane_crossing.md](docs/lane_crossing.md)     |
 | `LaneTracker` (map/reference lane) | ✅ implemented, owns the map, routing graph, and reference lane        |
 
 ---
@@ -157,6 +157,6 @@ Lane-following check parameters (`lane_following.*`) are documented in [`docs/la
 
 Lane-change classifier parameters (`lane_change.*`) are documented in [`docs/lane_change.md`](docs/lane_change.md#parameters).
 
-The intentional-crossing classifier gains its own enable flag and parameters when its logic lands.
+Intentional-crossing classifier parameters (`lane_crossing.*`) are documented in [`docs/lane_crossing.md`](docs/lane_crossing.md#parameters).
 
 ---
