@@ -1,7 +1,7 @@
 <launch>
   <arg name="param_path" default="$(find-pkg-share lane_event_classifier)/param/lane_event_classifier.param.yaml"/>
 
-  <node pkg="lane_event_classifier" exec="lane_event_classifier_node" name="lane_event_classifier" launch-prefix="konsole -e gdb -ex run --args" output="screen">
+  <node pkg="lane_event_classifier" exec="lane_event_classifier_node" name="lane_event_classifier" output="screen">
     <param from="$(var param_path)"/>
   </node>
 </launch>

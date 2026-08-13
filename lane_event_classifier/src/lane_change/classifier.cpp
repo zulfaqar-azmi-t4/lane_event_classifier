@@ -19,8 +19,6 @@
 
 #include <fmt/format.h>
 
-#include <optional>
-
 namespace lane_event_classifier
 {
 
@@ -52,9 +50,13 @@ LaneChangeClassifier::LaneChangeClassifier(
 
 void LaneChangeClassifier::reset_timers()
 {
-  crossing_signal_.reset();
-  settle_signal_.reset();
-  abort_signal_.reset();
+  tracked_crossing_.reset();
+  crossing_start_s_ = 0.0;
+  settle_active_ = false;
+  settle_lane_id_ = lanelet::InvalId;
+  settle_start_s_ = 0.0;
+  abort_active_ = false;
+  abort_start_s_ = 0.0;
 }
 
 bool LaneChangeClassifier::accumulate_crossing(
@@ -62,18 +64,35 @@ bool LaneChangeClassifier::accumulate_crossing(
 {
   // Both-persistence (docs/lane_change.md, "Persistence and confidence"): the same target lane
   // and a crossing location stable within tolerance.
-  const auto matches_tracked =
-    [this](const LaneChangeCrossing & tracked, const LaneChangeCrossing & current) {
-      return tracked.target_lane_id == current.target_lane_id &&
-             (current.crossing_point - tracked.crossing_point).norm() <=
-               config_.crossing_position_tolerance_m;
-    };
+  const bool matches_tracked =
+    tracked_crossing_ && tracked_crossing_->target_lane_id == crossing.target_lane_id &&
+    (crossing.crossing_point - tracked_crossing_->crossing_point).norm() <=
+      config_.crossing_position_tolerance_m;
+  if (!matches_tracked) {
+    tracked_crossing_ = crossing;  // anchor the crossing location; restart the window
+    crossing_start_s_ = now_s;
+  }
 
   // Confidence signal (docs/lane_change.md, "Persistence and confidence"): shortens
   // (never bypasses) the crossing-persistence window.
   const double effective_persist_duration =
     config_.crossing_persist_duration_s * (has_confidence_signal ? config_.confidence_factor : 1.0);
-  return crossing_signal_.update(crossing, now_s, effective_persist_duration, matches_tracked);
+  return (now_s - crossing_start_s_) >= effective_persist_duration;
+}
+
+bool LaneChangeClassifier::accumulate_settle(
+  const LaneChangeObservation & observation, double now_s)
+{
+  if (!observation.settle_lane_id) {
+    settle_active_ = false;
+    return false;
+  }
+  if (!settle_active_ || settle_lane_id_ != *observation.settle_lane_id) {
+    settle_active_ = true;
+    settle_lane_id_ = *observation.settle_lane_id;
+    settle_start_s_ = now_s;
+  }
+  return (now_s - settle_start_s_) >= config_.settle_confirm_duration_s;
 }
 
 bool LaneChangeClassifier::has_confidence_signal(
@@ -108,14 +127,13 @@ void LaneChangeClassifier::detect_onset(
   const LaneEventInput & input, const LaneChangeObservation & observation, double now_s)
 {
   if (!observation.crossing) {
-    crossing_signal_.reset();
+    tracked_crossing_.reset();
     return;
   }
   const bool confidence = has_confidence_signal(input, observation, *observation.crossing);
   if (accumulate_crossing(*observation.crossing, now_s, confidence)) {
     debug_reason_ = fmt::format(
-      "onset: trajectory crossing to lane {} persisted",
-      crossing_signal_.tracked()->target_lane_id);
+      "onset: trajectory crossing to lane {} persisted", tracked_crossing_->target_lane_id);
     phase_ = Phase::changing;
     reset_timers();
   }
@@ -126,24 +144,24 @@ void LaneChangeClassifier::detect_completion_or_abort(
 {
   // Completion / settle (docs/lane_change.md, "Finishing or aborting"): footprint fully inside a
   // target route primitive for the settle window.
-  const auto same_lane = [](lanelet::Id tracked, lanelet::Id current) {
-    return tracked == current;
-  };
-  if (settle_signal_.update(
-        observation.settle_lane_id, now_s, config_.settle_confirm_duration_s, same_lane)) {
+  if (accumulate_settle(observation, now_s)) {
     debug_reason_ =
-      fmt::format("settle: footprint fully inside route primitive {}", *settle_signal_.tracked());
+      fmt::format("settle: footprint fully inside route primitive {}", settle_lane_id_);
     phase_ = Phase::idle;
     reset_timers();
     return;
   }
   // Abort onset (docs/lane_change.md, "Finishing or aborting"): trajectory heads back into the
   // reference lane, persisted like onset.
-  const auto always_matches = [](bool, bool) { return true; };
-  const std::optional<bool> abort_condition =
-    observation.trajectory_returns_to_reference ? std::optional{true} : std::nullopt;
-  if (abort_signal_.update(
-        abort_condition, now_s, config_.crossing_persist_duration_s, always_matches)) {
+  if (!observation.trajectory_returns_to_reference) {
+    abort_active_ = false;
+    return;
+  }
+  if (!abort_active_) {
+    abort_active_ = true;
+    abort_start_s_ = now_s;
+  }
+  if ((now_s - abort_start_s_) >= config_.crossing_persist_duration_s) {
     debug_reason_ = "abort: trajectory returned toward the reference lane";
     phase_ = Phase::aborting;
     reset_timers();
@@ -162,13 +180,9 @@ void LaneChangeClassifier::detect_abort_completion_or_recommit(
     return;
   }
   // A settle stays live from ABORTING (docs/lane_change.md, "Settle still counts").
-  const auto same_lane = [](lanelet::Id tracked, lanelet::Id current) {
-    return tracked == current;
-  };
-  if (settle_signal_.update(
-        observation.settle_lane_id, now_s, config_.settle_confirm_duration_s, same_lane)) {
+  if (accumulate_settle(observation, now_s)) {
     debug_reason_ = fmt::format(
-      "settle from aborting: footprint fully inside route primitive {}", *settle_signal_.tracked());
+      "settle from aborting: footprint fully inside route primitive {}", settle_lane_id_);
     phase_ = Phase::idle;
     reset_timers();
     return;
@@ -176,14 +190,13 @@ void LaneChangeClassifier::detect_abort_completion_or_recommit(
   // Re-commit (docs/lane_change.md, "Aborting"): trajectory swings back toward the target lane,
   // persisted like onset.
   if (!observation.crossing) {
-    crossing_signal_.reset();
+    tracked_crossing_.reset();
     return;
   }
   const bool confidence = has_confidence_signal(input, observation, *observation.crossing);
   if (accumulate_crossing(*observation.crossing, now_s, confidence)) {
     debug_reason_ = fmt::format(
-      "re-commit: trajectory crossing to lane {} persisted",
-      crossing_signal_.tracked()->target_lane_id);
+      "re-commit: trajectory crossing to lane {} persisted", tracked_crossing_->target_lane_id);
     phase_ = Phase::changing;
     reset_timers();
   }

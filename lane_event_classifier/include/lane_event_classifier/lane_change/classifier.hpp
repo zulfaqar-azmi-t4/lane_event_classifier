@@ -15,13 +15,13 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CHANGE__CLASSIFIER_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CHANGE__CLASSIFIER_HPP_
 
-#include <lane_event_classifier/detail/debounced_signal.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_change/geometry.hpp>
 #include <lane_event_classifier/lane_event_classifier_base.hpp>
 #include <lane_event_classifier/lane_event_classifier_parameters.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace lane_event_classifier
@@ -77,6 +77,9 @@ private:
   [[nodiscard]] bool accumulate_crossing(
     const LaneChangeCrossing & crossing, double now_s, bool has_confidence_signal);
 
+  /** @brief Accumulates the footprint-settled-in-target-primitive test over the settle window. */
+  [[nodiscard]] bool accumulate_settle(const LaneChangeObservation & observation, double now_s);
+
   /** @brief Clears all persistence timers on a phase transition. */
   void reset_timers();
 
@@ -89,13 +92,17 @@ private:
   mutable std::string debug_reason_;
 
   // Crossing persistence (onset in idle, re-commit in aborting).
-  DebouncedSignal<LaneChangeCrossing> crossing_signal_;
+  std::optional<LaneChangeCrossing> tracked_crossing_;
+  double crossing_start_s_{0.0};
 
   // Settle persistence (footprint fully inside a target route primitive).
-  DebouncedSignal<lanelet::Id> settle_signal_;
+  bool settle_active_{false};
+  lanelet::Id settle_lane_id_{lanelet::InvalId};
+  double settle_start_s_{0.0};
 
   // Abort persistence (trajectory heads back into the reference lane).
-  DebouncedSignal<bool> abort_signal_;
+  bool abort_active_{false};
+  double abort_start_s_{0.0};
 };
 
 }  // namespace lane_event_classifier

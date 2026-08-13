@@ -336,28 +336,12 @@ struct FootprintCrossing
   std::string debug_note;
 };
 
-// Whether a candidate object lies within proximity_m of the point (the object being dodged is
-// beside the ego when its body pokes over the line, not merely somewhere in the ahead-of-ego
-// window used to qualify candidates in the first place).
-bool candidate_object_near_point(
-  const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses,
-  const lanelet::BasicPoint2d & point, double proximity_m)
-{
-  return std::any_of(
-    candidate_object_poses.cbegin(), candidate_object_poses.cend(),
-    [&](const geometry_msgs::msg::Pose & pose) {
-      return std::hypot(pose.position.x - point.x(), pose.position.y - point.y()) <= proximity_m;
-    });
-}
-
 FootprintCrossing get_footprint_crossing(
   const LaneTracker & tracker, lanelet::Id reference_lane_id,
   const std::unordered_set<lanelet::Id> & sequence_ids,
   const std::vector<lanelet::BasicPoint2d> & footprint,
   const std::vector<lanelet::Id> & footprint_ids, const LaneSequenceBounds & bounds,
-  double footprint_boundary_overshoot_m,
-  const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses,
-  double footprint_crossing_object_proximity_m)
+  double footprint_boundary_overshoot_m)
 {
   std::optional<CrossingCandidate> best;
   double deepest_overshoot_m = footprint_boundary_overshoot_m;
@@ -375,10 +359,7 @@ FootprintCrossing get_footprint_crossing(
     if (is_shoulder) {
       continue;
     }
-    if (
-      overshoot.deepest_corner && overshoot.overshoot_m >= deepest_overshoot_m &&
-      candidate_object_near_point(
-        candidate_object_poses, *overshoot.deepest_corner, footprint_crossing_object_proximity_m)) {
+    if (overshoot.deepest_corner && overshoot.overshoot_m >= deepest_overshoot_m) {
       deepest_overshoot_m = overshoot.overshoot_m;
       best = CrossingCandidate{
         point_is_nearer_left_boundary(*overshoot.deepest_corner, bounds),
@@ -443,11 +424,10 @@ ResolvedCrossing resolve_crossing(
 
 LaneCrossingGeometry::LaneCrossingGeometry(
   double crossing_look_ahead_m, double footprint_boundary_overshoot_m,
-  double predictive_lateral_trigger_distance_m, double footprint_crossing_object_proximity_m)
+  double predictive_lateral_trigger_distance_m)
 : crossing_look_ahead_m_{crossing_look_ahead_m},
   footprint_boundary_overshoot_m_{footprint_boundary_overshoot_m},
-  predictive_lateral_trigger_distance_m_{predictive_lateral_trigger_distance_m},
-  footprint_crossing_object_proximity_m_{footprint_crossing_object_proximity_m}
+  predictive_lateral_trigger_distance_m_{predictive_lateral_trigger_distance_m}
 {
 }
 
@@ -578,8 +558,7 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
   const auto footprint_crossing =
     has_footprint ? get_footprint_crossing(
                       tracker, reference_lane_id, sequence_ids, footprint, footprint_ids,
-                      lane_sequence_bounds, footprint_boundary_overshoot_m_, candidate_object_poses,
-                      footprint_crossing_object_proximity_m_)
+                      lane_sequence_bounds, footprint_boundary_overshoot_m_)
                   : FootprintCrossing{std::nullopt, "none"};
 
   // Predictive fires earlier, so prefer it when present; otherwise the body-over-the-line signal
