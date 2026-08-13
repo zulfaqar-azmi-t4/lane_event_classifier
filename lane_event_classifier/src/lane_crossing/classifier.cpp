@@ -19,6 +19,7 @@
 
 #include <fmt/format.h>
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -58,10 +59,8 @@ IntentionalCrossingClassifier::IntentionalCrossingClassifier(
 
 void IntentionalCrossingClassifier::reset_timers()
 {
-  tracked_crossing_.reset();
-  crossing_start_s_ = 0.0;
-  return_active_ = false;
-  return_start_s_ = 0.0;
+  crossing_signal_.reset();
+  return_signal_.reset();
   remembered_candidate_poses_.clear();
   last_candidate_seen_s_ = 0.0;
 }
@@ -70,33 +69,17 @@ bool IntentionalCrossingClassifier::accumulate_crossing(
   const LaneCrossingCrossing & crossing, double now_s, bool has_confidence_signal)
 {
   // Persistence (docs/lane_crossing.md, "Persistence"): same side + stable crossing point.
-  const bool matches_tracked =
-    tracked_crossing_ && tracked_crossing_->is_to_left == crossing.is_to_left &&
-    (crossing.crossing_point - tracked_crossing_->crossing_point).norm() <=
-      config_.crossing_position_tolerance_m;
-  if (!matches_tracked) {
-    tracked_crossing_ = crossing;  // anchor the crossing location; restart the window
-    crossing_start_s_ = now_s;
-  }
+  const auto matches_tracked =
+    [this](const LaneCrossingCrossing & tracked, const LaneCrossingCrossing & current) {
+      return tracked.is_to_left == current.is_to_left &&
+             (current.crossing_point - tracked.crossing_point).norm() <=
+               config_.crossing_position_tolerance_m;
+    };
 
   // Confidence signal (docs/lane_crossing.md, "Confidence signal"): shortens the window.
   const double effective_persist_duration =
     config_.crossing_persist_duration_s * (has_confidence_signal ? config_.confidence_factor : 1.0);
-  return (now_s - crossing_start_s_) >= effective_persist_duration;
-}
-
-bool IntentionalCrossingClassifier::accumulate_return(
-  const LaneCrossingObservation & observation, double now_s)
-{
-  if (!observation.is_footprint_inside_reference_sequence) {
-    return_active_ = false;
-    return false;
-  }
-  if (!return_active_) {
-    return_active_ = true;
-    return_start_s_ = now_s;
-  }
-  return (now_s - return_start_s_) >= config_.settle_confirm_duration_s;
+  return crossing_signal_.update(crossing, now_s, effective_persist_duration, matches_tracked);
 }
 
 bool IntentionalCrossingClassifier::has_confidence_signal(
@@ -147,7 +130,7 @@ void IntentionalCrossingClassifier::detect_onset(
 {
   // Onset (docs/lane_crossing.md, "Onset"): the candidate requirement is folded into the crossing.
   if (!observation.crossing) {
-    tracked_crossing_.reset();
+    crossing_signal_.reset();
     // Per-cycle diagnostic (surfaced throttled by the node): why onset did not fire this cycle.
     debug_reason_ = fmt::format(
       "idle: on_route_straight={} | crossing: {}", observation.is_on_route_straight ? "yes" : "no",
@@ -156,9 +139,7 @@ void IntentionalCrossingClassifier::detect_onset(
   }
   const bool confidence = has_confidence_signal(input, *observation.crossing);
   if (accumulate_crossing(*observation.crossing, now_s, confidence)) {
-    debug_reason_ = fmt::format(
-      "onset: trajectory brackets a candidate object, crossing the {} boundary",
-      tracked_crossing_->is_to_left ? "left" : "right");
+    debug_reason_ = fmt::format("onset: {}", observation.debug_crossing_diagnostic);
     phase_ = Phase::crossing;
     reset_timers();
   }
@@ -181,7 +162,11 @@ void IntentionalCrossingClassifier::detect_completion(
   }
 
   // Return: footprint fully back inside the route straight sequence for the settle window.
-  if (accumulate_return(observation, now_s)) {
+  const auto always_matches = [](bool, bool) { return true; };
+  const std::optional<bool> return_condition =
+    observation.is_footprint_inside_reference_sequence ? std::optional{true} : std::nullopt;
+  if (return_signal_.update(
+        return_condition, now_s, config_.settle_confirm_duration_s, always_matches)) {
     debug_reason_ = "completed: footprint returned fully into the route sequence";
     phase_ = Phase::idle;
     reset_timers();

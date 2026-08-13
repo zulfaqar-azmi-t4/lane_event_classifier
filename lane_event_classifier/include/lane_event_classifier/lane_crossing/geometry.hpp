@@ -71,7 +71,7 @@ class LaneCrossingGeometry
 public:
   LaneCrossingGeometry(
     double crossing_look_ahead_m, double footprint_boundary_overshoot_m,
-    double predictive_lateral_trigger_distance_m);
+    double predictive_lateral_trigger_distance_m, double footprint_crossing_object_proximity_m);
 
   /** @brief Builds the observation for this cycle from the tracker's (already refreshed) state.
    * @param candidate_object_poses Objects the ego might cross to avoid (from LaneCrossingObjects):
@@ -143,6 +143,12 @@ private:
                                              // (trajectory) source to onset: it fires only once
                                              // the body has drifted close to the boundary it
                                              // will cross, not off a dodge merely planned ahead
+  double footprint_crossing_object_proximity_m_;  // max distance from the poking footprint corner
+                                                  // to a candidate object for the physical
+                                                  // (footprint) source to onset: ties the crossing
+                                                  // to the object it dodges, rather than any
+                                                  // candidate merely qualifying within the far
+                                                  // longer object_longitudinal_window_m
 };
 
 }  // namespace lane_event_classifier

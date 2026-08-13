@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CROSSING__CLASSIFIER_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CROSSING__CLASSIFIER_HPP_
 
+#include <lane_event_classifier/detail/debounced_signal.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_crossing/geometry.hpp>
 #include <lane_event_classifier/lane_crossing/objects.hpp>
@@ -24,7 +25,6 @@
 #include <geometry_msgs/msg/pose.hpp>
 
 #include <cstdint>
-#include <optional>
 #include <string>
 #include <vector>
 
@@ -77,9 +77,6 @@ private:
   [[nodiscard]] bool accumulate_crossing(
     const LaneCrossingCrossing & crossing, double now_s, bool has_confidence_signal);
 
-  /** @brief Accumulates the footprint-back-in-reference-sequence test over the settle window. */
-  [[nodiscard]] bool accumulate_return(const LaneCrossingObservation & observation, double now_s);
-
   /** @brief Clears the persistence timers on a phase transition. */
   void reset_timers();
 
@@ -93,16 +90,14 @@ private:
   mutable std::string debug_reason_;
 
   // Crossing persistence (onset in idle).
-  std::optional<LaneCrossingCrossing> tracked_crossing_;
-  double crossing_start_s_{0.0};
+  DebouncedSignal<LaneCrossingCrossing> crossing_signal_;
 
   // Candidate memory (docs/lane_crossing.md, "Candidate object"): recent poses + last-seen stamp.
   std::vector<geometry_msgs::msg::Pose> remembered_candidate_poses_;
   double last_candidate_seen_s_{0.0};
 
   // Return persistence (footprint back inside the reference straight sequence).
-  bool return_active_{false};
-  double return_start_s_{0.0};
+  DebouncedSignal<bool> return_signal_;
 };
 
 }  // namespace lane_event_classifier
