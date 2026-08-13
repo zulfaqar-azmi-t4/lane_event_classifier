@@ -67,6 +67,10 @@ public:
     const LaneTracker & tracker, const LaneEventInput & input) const;
 
 private:
+  /** @brief True when the reference lane is on the route and continues straight onto the route. */
+  [[nodiscard]] static bool is_driving_straight_stays_on_route(
+    const LaneTracker & tracker, lanelet::Id reference_lane_id);
+
   /** @brief The valid lane-change crossing of the trajectory over the reference boundary, if any.
    * @param trajectory_points Forward trajectory samples (computed once per cycle by observe). */
   [[nodiscard]] std::optional<LaneChangeCrossing> compute_crossing(

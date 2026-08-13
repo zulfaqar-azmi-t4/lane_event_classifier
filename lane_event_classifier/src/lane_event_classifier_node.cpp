@@ -253,16 +253,15 @@ void LaneEventClassifierNode::on_trajectory(
   out.driving_state.state = current_state_val;
   pub_driving_factor_->publish(out);
 
-  // Freeze the reference lane while an event is active, and release it once the event ends. A
-  // maneuver ends in a lane that is not a forward successor of the reference (e.g. a lane change
-  // into a parallel lane), and the tracker only re-anchors into a forward successor; without
-  // releasing, the reference would stay pinned to the origin lane forever and the classifier would
-  // re-detect the same crossing every cycle. Releasing re-anchors the tracker to the lane the ego
-  // settled into. Holding also activates the far-departure reset in check_tracking_state (a manual
-  // takeover that drives away from the held lane), which is gated on the reference lane being held.
+  // Freeze the reference lane while an event runs, release it when the event ends; see README.md,
+  // "Holding the reference lane".
+  const auto & ref_lane = lane_tracker_.reference_lane();
   if (is_any_event_active && !lane_tracker_.is_reference_lane_held()) {
     lane_tracker_.hold_reference_lane();
-  } else if (!is_any_event_active && lane_tracker_.is_reference_lane_held()) {
+  } else if (
+    (!is_any_event_active || ref_lane.is_reference_lane_road_shoulder ||
+     ref_lane.is_reference_lane_intersection) &&
+    lane_tracker_.is_reference_lane_held()) {
     lane_tracker_.release_reference_lane();
   }
 

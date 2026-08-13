@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <autoware/lanelet2_utils/intersection.hpp>
 #include <autoware/lanelet2_utils/kind.hpp>
-#include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/lane_change/geometry.hpp>
 
 #include <lanelet2_core/geometry/Lanelet.h>
@@ -24,8 +22,7 @@
 #include <functional>
 #include <limits>
 #include <optional>
-#include <string>
-#include <utility>
+#include <unordered_set>
 #include <vector>
 
 namespace lane_event_classifier
@@ -35,19 +32,7 @@ namespace
 {
 namespace lanelet2_utils = autoware::experimental::lanelet2_utils;
 
-// Onset exemption (docs/lane_change.md, "Exemptions"): a turn-direction ("left"/"right") or
-// intersection lanelet is exempt from lane-change onset.
-bool is_turn_direction_lane(const lanelet::ConstLanelet & lane)
-{
-  if (lanelet2_utils::is_intersection_lanelet(lane)) {
-    return true;
-  }
-  const auto turn_direction = lane.attributeOr("turn_direction", std::string{});
-  return turn_direction == "left" || turn_direction == "right";
-}
-
-// Ordered trajectory points from the one nearest the ego, forward, until the accumulated arc length
-// reaches look_ahead_m.
+// Points from nearest to ego forward, up to look_ahead_m.
 std::vector<lanelet::BasicPoint2d> forward_trajectory_points(
   const autoware_planning_msgs::msg::Trajectory & trajectory, const lanelet::BasicPoint2d & ego,
   double look_ahead_m)
@@ -90,6 +75,51 @@ std::vector<lanelet::BasicPoint2d> forward_trajectory_points(
   }
   return points;
 }
+
+// Outcome of scanning the trajectory for the reference lane's lateral boundary crossing.
+struct TrajectoryCrossingScan
+{
+  std::optional<lanelet::Id> target_lane_id;  // first off-sequence lane the trajectory enters
+  std::optional<lanelet::BasicPoint2d> crossing_point;  // where that lane is first entered
+  bool heads_to_route_primitive{false};  // some off-sequence lane on the way is route-preferred
+};
+
+// Scans forward for the first off-sequence sample; see docs/lane_change.md, "Finding a crossing".
+TrajectoryCrossingScan scan_trajectory_for_crossing(
+  const LaneTracker & tracker, const std::unordered_set<lanelet::Id> & lane_sequence,
+  const std::vector<lanelet::BasicPoint2d> & trajectory_points)
+{
+  TrajectoryCrossingScan scan;
+  for (const auto & point : trajectory_points) {
+    bool is_in_lane_sequence = false;
+    std::optional<lanelet::Id> off_sequence_id;
+    for (const auto id : tracker.lanelet_ids_at(point)) {
+      if (lane_sequence.count(id) != 0) {
+        is_in_lane_sequence = true;
+        continue;
+      }
+
+      if (!off_sequence_id) {
+        off_sequence_id = id;
+      }
+
+      if (tracker.is_route_primitive(id)) {
+        scan.heads_to_route_primitive = true;
+      }
+    }
+
+    // First off-sequence point marks the lateral boundary crossing.
+    if (!scan.target_lane_id && !is_in_lane_sequence && off_sequence_id) {
+      scan.target_lane_id = *off_sequence_id;
+      scan.crossing_point = point;
+    }
+    // Remaining samples cannot change the outcome.
+    if (scan.target_lane_id && scan.heads_to_route_primitive) {
+      break;
+    }
+  }
+  return scan;
+}
 }  // namespace
 
 LaneChangeGeometry::LaneChangeGeometry(double crossing_look_ahead_m)
@@ -125,103 +155,76 @@ LaneChangeObservation LaneChangeGeometry::observe(
   return observation;
 }
 
+bool LaneChangeGeometry::is_driving_straight_stays_on_route(
+  const LaneTracker & tracker, lanelet::Id reference_lane_id)
+{
+  if (!tracker.is_route_primitive(reference_lane_id)) {
+    return false;
+  }
+
+  const auto next_ids = tracker.next_lane_ids(reference_lane_id);
+  return std::any_of(next_ids.cbegin(), next_ids.cend(), [&tracker](const lanelet::Id next_id) {
+    return tracker.is_route_primitive(next_id);
+  });
+}
+
 std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
   const LaneTracker & tracker, const LaneEventInput & input,
   const std::vector<lanelet::BasicPoint2d> & trajectory_points) const
 {
-  if (trajectory_points.empty()) {
+  if (trajectory_points.empty() || !input.route_ptr) {
     return std::nullopt;
   }
-  const auto reference_lane_id = tracker.reference_lane().reference_lane_id;
+  // Reference-lane attributes were resolved by the tracker when it anchored onto the lane.
+  const auto & reference = tracker.reference_lane();
+  const auto reference_lane_id = reference.reference_lane_id;
+
+  // Straight-on-route skip; see docs/lane_change.md, "Finding a crossing".
+  if (is_driving_straight_stays_on_route(tracker, reference_lane_id)) {
+    return std::nullopt;
+  }
+
   const auto reference_lane_opt = tracker.get_lanelet(reference_lane_id);
-  if (!reference_lane_opt || !input.route_ptr) {
+  if (!reference_lane_opt) {
     return std::nullopt;
   }
+
   const auto & reference_lane = *reference_lane_opt;
 
-  // Straight-on-route skip (docs/lane_change.md, "Finding a crossing"): if the reference lane is a
-  // route primitive whose straight successor is also a route primitive, going straight stays
-  // on-route, so any lateral crossing targets an off-route lane.
-  if (tracker.is_route_primitive(reference_lane_id)) {
-    const auto next_ids = tracker.next_lane_ids(reference_lane_id);
-    const bool driving_straight_stays_on_route = std::any_of(
-      next_ids.cbegin(), next_ids.cend(),
-      [&tracker](const lanelet::Id next_id) { return tracker.is_route_primitive(next_id); });
-    if (driving_straight_stays_on_route) {
-      return std::nullopt;
-    }
+  if (reference.is_reference_lane_road_shoulder) {
+    return std::nullopt;
   }
 
   const auto & lane_sequence =
     tracker.straight_lane_sequence_ids(reference_lane, crossing_look_ahead_m_);
 
-  std::optional<lanelet::Id> target_lane_id;
-  std::optional<lanelet::BasicPoint2d> crossing_point;
-  bool heads_to_route_primitive = false;
-
-  // Classifies the lanes containing a trajectory point: whether the point is still in the straight
-  // lane sequence, and the first off-sequence lane it entered. Also flags the necessity check
-  // (docs/lane_change.md, "Finding a crossing") when the trajectory reaches a route primitive
-  // laterally, possibly through intermediate lanes.
-  const auto classify_point_lanes = [&lane_sequence, &tracker, &heads_to_route_primitive](
-                                      const std::vector<lanelet::Id> & containing_ids) {
-    bool is_in_lane_sequence = false;
-    std::optional<lanelet::Id> off_sequence_id;
-    for (const auto id : containing_ids) {
-      if (lane_sequence.count(id) != 0) {
-        is_in_lane_sequence = true;
-      } else {
-        if (!off_sequence_id) {
-          off_sequence_id = id;
-        }
-        if (tracker.is_route_primitive(id)) {
-          heads_to_route_primitive = true;
-        }
-      }
-    }
-    return std::make_pair(is_in_lane_sequence, off_sequence_id);
-  };
-
-  for (const auto & point : trajectory_points) {
-    const auto [is_in_lane_sequence, off_sequence_id] =
-      std::invoke(classify_point_lanes, tracker.lanelet_ids_at(point));
-    // The first trajectory point that is inside a lane but no longer in the straight lane sequence
-    // marks where the trajectory crosses the reference lane's lateral boundary.
-    if (!target_lane_id && !is_in_lane_sequence && off_sequence_id) {
-      target_lane_id = *off_sequence_id;
-      crossing_point = point;
-    }
-    // Once the crossing is located and the trajectory is known to reach a route primitive, the
-    // remaining samples cannot change the outcome — stop querying lanes for them.
-    if (target_lane_id && heads_to_route_primitive) {
-      break;
-    }
-  }
+  const auto [target_lane_id, crossing_point, heads_to_route_primitive] =
+    scan_trajectory_for_crossing(tracker, lane_sequence, trajectory_points);
   if (!target_lane_id || !heads_to_route_primitive) {
     return std::nullopt;
   }
 
-  // Onset exemptions (docs/lane_change.md, "Exemptions"): turn-direction / intersection reference
-  // lane, or a shoulder target lane.
-  if (is_turn_direction_lane(reference_lane)) {
+  // Onset exemptions; see docs/lane_change.md, "Exemptions". An intersection lanelet is one
+  // carrying a turn_direction attribute, so this covers left/right turn lanes too.
+  if (reference.is_reference_lane_intersection) {
     return std::nullopt;
   }
+
   const auto target_lane_opt = tracker.get_lanelet(*target_lane_id);
   if (target_lane_opt && lanelet2_utils::is_shoulder_lane(*target_lane_opt)) {
     return std::nullopt;
   }
 
-  // Which side of the reference lane the trajectory crosses (signed lateral offset of the crossing
-  // point from the centerline; positive == left of travel direction).
+  // Signed offset from the centerline; positive means left.
   const double lateral_offset =
     lanelet::geometry::toArcCoordinates(reference_lane.centerline2d(), *crossing_point).distance;
   const bool is_to_left = lateral_offset > 0.0;
 
-  // Onset exemption (docs/lane_change.md, "Exemptions"): the crossed boundary is a virtual
-  // linestring.
-  const auto & crossed_bound =
-    is_to_left ? reference_lane.leftBound() : reference_lane.rightBound();
-  if (is_virtual_linestring(crossed_bound)) {
+  // Onset exemption; see docs/lane_change.md, "Exemptions".
+  const bool is_crossed_bound_virtual = is_to_left
+                                          ? reference.is_reference_lane_left_bound_virtual
+                                          : reference.is_reference_lane_right_bound_virtual;
+  if (is_crossed_bound_virtual) {
     return std::nullopt;
   }
 
