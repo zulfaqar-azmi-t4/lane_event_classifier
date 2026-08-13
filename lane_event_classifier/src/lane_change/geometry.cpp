@@ -79,9 +79,8 @@ std::vector<lanelet::BasicPoint2d> forward_trajectory_points(
 // Outcome of scanning the trajectory for the reference lane's lateral boundary crossing.
 struct TrajectoryCrossingScan
 {
-  std::optional<lanelet::Id> target_lane_id;  // first off-sequence lane the trajectory enters
-  std::optional<lanelet::BasicPoint2d> crossing_point;  // where that lane is first entered
-  bool heads_to_route_primitive{false};  // some off-sequence lane on the way is route-preferred
+  std::optional<lanelet::Id> target_lane_id;  // first off-sequence route-preferred lane entered
+  std::optional<lanelet::BasicPoint2d> crossing_point;  // first sample outside the lane sequence
 };
 
 // Scans forward for the first off-sequence sample; see docs/lane_change.md, "Finding a crossing".
@@ -92,29 +91,25 @@ TrajectoryCrossingScan scan_trajectory_for_crossing(
   TrajectoryCrossingScan scan;
   for (const auto & point : trajectory_points) {
     bool is_in_lane_sequence = false;
-    std::optional<lanelet::Id> off_sequence_id;
+    bool has_off_sequence_lane = false;
     for (const auto id : tracker.lanelet_ids_at(point)) {
       if (lane_sequence.count(id) != 0) {
         is_in_lane_sequence = true;
         continue;
       }
-
-      if (!off_sequence_id) {
-        off_sequence_id = id;
-      }
-
-      if (tracker.is_route_primitive(id)) {
-        scan.heads_to_route_primitive = true;
+      has_off_sequence_lane = true;
+      // The target must be route-preferred, otherwise the settle check can never confirm it.
+      if (!scan.target_lane_id && tracker.is_route_primitive(id)) {
+        scan.target_lane_id = id;
       }
     }
 
-    // First off-sequence point marks the lateral boundary crossing.
-    if (!scan.target_lane_id && !is_in_lane_sequence && off_sequence_id) {
-      scan.target_lane_id = *off_sequence_id;
+    // First off-sequence sample marks the lateral boundary crossing.
+    if (!scan.crossing_point && !is_in_lane_sequence && has_off_sequence_lane) {
       scan.crossing_point = point;
     }
     // Remaining samples cannot change the outcome.
-    if (scan.target_lane_id && scan.heads_to_route_primitive) {
+    if (scan.target_lane_id && scan.crossing_point) {
       break;
     }
   }
@@ -198,9 +193,9 @@ std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
   const auto & lane_sequence =
     tracker.straight_lane_sequence_ids(reference_lane, crossing_look_ahead_m_);
 
-  const auto [target_lane_id, crossing_point, heads_to_route_primitive] =
+  const auto [target_lane_id, crossing_point] =
     scan_trajectory_for_crossing(tracker, lane_sequence, trajectory_points);
-  if (!target_lane_id || !heads_to_route_primitive) {
+  if (!target_lane_id || !crossing_point) {
     return std::nullopt;
   }
 

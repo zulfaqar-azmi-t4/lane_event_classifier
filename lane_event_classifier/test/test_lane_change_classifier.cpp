@@ -298,6 +298,31 @@ TEST(LaneChangeTest, double_left_change_settles_only_at_route_primitive)
   EXPECT_TRUE(settled);
 }
 
+// Double left change 50 -> 48 -> 47: the reported target is route primitive 47, not the
+// intermediate off-route lane 48. Naming 48 would anchor the onset debounce and the log on a lane
+// the settle check can never confirm.
+TEST(LaneChangeTest, double_left_change_targets_the_route_primitive)
+{
+  auto map = load_test_map();
+  ASSERT_TRUE(static_cast<bool>(map));
+
+  LaneTracker tracker;
+  ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
+
+  const std::vector<lanelet::Id> route{route_ids().begin(), route_ids().end()};
+  const auto crossing_trajectory = build_lane_trajectory(map, {50, 48, 47}, 0.3, 0.9, 30);
+  const auto ego_in_50 = crossing_trajectory.front();
+  const auto input =
+    test_maps::make_trajectory_input(route, ego_in_50, 0, 0, crossing_trajectory, {ego_in_50});
+  [[maybe_unused]] const auto update_result = tracker.update(input);
+  ASSERT_EQ(tracker.reference_lane().reference_lane_id, 50);
+
+  const LaneChangeGeometry geometry{make_config().crossing_look_ahead_m};
+  const auto observation = geometry.observe(tracker, input);
+  ASSERT_TRUE(observation.crossing.has_value());
+  EXPECT_EQ(observation.crossing->target_lane_id, 47);
+}
+
 // A crossing from an on-route primitive (47) toward an off-route lane (48) is never a lane change:
 // going straight (47 -> 1167) already keeps the ego on-route (the straight-on-route skip case).
 TEST(LaneChangeTest, on_route_primitive_crossing_off_route_is_not_lane_change)

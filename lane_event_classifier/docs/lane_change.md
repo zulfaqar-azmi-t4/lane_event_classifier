@@ -63,12 +63,13 @@ forward until the arc length reaches `crossing_look_ahead_m`, and looks for the 
    is also a route primitive, going straight already stays on-route, so any sideways move leaves the
    route rather than changing lanes on it. No onset.
 2. **Walk the trajectory.** For each forward point, take the lanes containing it. The first point
-   that lands in a lane outside the [straight lane sequence](#key-words) marks the crossing: that lane is the
-   target, and the point is the crossing point. The side comes from the sign of the lateral offset
-   from the reference centerline.
+   that lands outside the [straight lane sequence](#key-words) is the crossing point. The side comes
+   from the sign of the lateral offset from the reference centerline.
 3. **Necessity.** The crossing counts only when the trajectory reaches a route primitive sideways,
    possibly through non-primitive intermediate lanes. A drift into an off-route lane is not a lane
-   change.
+   change. That route primitive — the first one found off the sequence, not the intermediate lane
+   traversed to get there — is the target lane, so the target is always a lane the settle check can
+   confirm.
 
 ### Exemptions
 
