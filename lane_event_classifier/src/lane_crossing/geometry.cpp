@@ -239,11 +239,11 @@ std::optional<CrossingCandidate> get_trajectory_crossing(
   const std::vector<lanelet::BasicPoint2d> & trajectory_points, const LaneSequenceBounds & bounds,
   const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses,
   double distance_to_left_boundary_m, double distance_to_right_boundary_m,
-  double lateral_trigger_distance_m, std::size_t & departure_count)
+  double lateral_trigger_distance_m, std::size_t & debug_departure_count)
 {
   const auto crossings = get_ordered_boundary_crossings(trajectory_points, bounds);
   const auto departures = get_departure_intervals(crossings);
-  departure_count = departures.size();
+  debug_departure_count = departures.size();
 
   std::vector<double> candidate_arcs;
   candidate_arcs.reserve(candidate_object_poses.size());
@@ -310,7 +310,7 @@ NeighbourOvershoot deepest_footprint_overshoot(
 struct FootprintCrossing
 {
   std::optional<CrossingCandidate> crossing;
-  std::string note;
+  std::string debug_note;
 };
 
 FootprintCrossing get_footprint_crossing(
@@ -322,7 +322,7 @@ FootprintCrossing get_footprint_crossing(
 {
   std::optional<CrossingCandidate> best;
   double deepest_overshoot_m = footprint_boundary_overshoot_m;
-  std::vector<std::string> notes;
+  std::vector<std::string> debug_notes;
   for (const auto neighbour_id : footprint_ids) {
     if (sequence_ids.count(neighbour_id) != 0) {
       continue;  // a lane of the sequence, not a crossing
@@ -331,7 +331,7 @@ FootprintCrossing get_footprint_crossing(
       deepest_footprint_overshoot(tracker, reference_lane_id, neighbour_id, footprint);
     const auto neighbour_lane = tracker.get_lanelet(neighbour_id);
     const bool is_shoulder = neighbour_lane && lanelet2_utils::is_shoulder_lane(*neighbour_lane);
-    notes.push_back(fmt::format(
+    debug_notes.push_back(fmt::format(
       "{}:{:.2f}m{}", neighbour_id, overshoot.overshoot_m, is_shoulder ? " shoulder-exempt" : ""));
     if (is_shoulder) {
       continue;
@@ -343,7 +343,9 @@ FootprintCrossing get_footprint_crossing(
         *overshoot.deepest_corner};
     }
   }
-  return {best, notes.empty() ? std::string{"none"} : fmt::format("{}", fmt::join(notes, " "))};
+  return {
+    best,
+    debug_notes.empty() ? std::string{"none"} : fmt::format("{}", fmt::join(debug_notes, " "))};
 }
 
 // A crossing decision plus its diagnostic (nullopt crossing with a reason when there is none or an
@@ -351,7 +353,7 @@ FootprintCrossing get_footprint_crossing(
 struct ResolvedCrossing
 {
   std::optional<LaneCrossingCrossing> crossing;
-  std::string diagnostic;
+  std::string debug_diagnostic;
 };
 
 // Turn a chosen crossing into the observation crossing: apply the virtual-boundary exemption on the
@@ -359,7 +361,7 @@ struct ResolvedCrossing
 ResolvedCrossing resolve_crossing(
   const LaneTracker & tracker, const lanelet::ConstLanelet & reference_lane,
   const std::unordered_set<lanelet::Id> & sequence_ids, const CrossingCandidate & candidate,
-  const std::string & source, const std::string & detail)
+  const std::string & debug_source, const std::string & debug_detail)
 {
   const bool is_to_left = candidate.is_to_left;
   const lanelet::BasicPoint2d crossing_point = candidate.point;
@@ -393,7 +395,7 @@ ResolvedCrossing resolve_crossing(
   return {
     crossing, fmt::format(
                 "crossing to {} (target={} via {}; {})", is_to_left ? "left" : "right",
-                target_lane_id, source, detail)};
+                target_lane_id, debug_source, debug_detail)};
 }
 }  // namespace
 
@@ -447,7 +449,7 @@ LaneCrossingObservation LaneCrossingGeometry::observe(
     tracker, *reference_lane_opt, sequence_ids, trajectory_points, input.footprint, footprint_ids,
     candidate_object_poses, boundary_look_ahead_m);
   observation.crossing = std::move(crossing_result.crossing);
-  observation.crossing_diagnostic = std::move(crossing_result.diagnostic);
+  observation.debug_crossing_diagnostic = std::move(crossing_result.debug_diagnostic);
   observation.is_footprint_inside_reference_sequence =
     compute_is_footprint_inside_reference_sequence(tracker, input, sequence_ids, footprint_ids);
   observation.full_entry_lane_id =
@@ -516,12 +518,12 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
     footprint_distance_to_boundary(footprint, lane_sequence_bounds.right);
 
   // Source (a) - predictive trajectory bracket (early, centerline based, ego-near-boundary gated).
-  std::size_t departure_count = 0;
+  std::size_t debug_departure_count = 0;
   const auto trajectory_crossing =
     has_trajectory ? get_trajectory_crossing(
                        trajectory_points, lane_sequence_bounds, candidate_object_poses,
                        distance_to_left_boundary_m, distance_to_right_boundary_m,
-                       predictive_lateral_trigger_distance_m_, departure_count)
+                       predictive_lateral_trigger_distance_m_, debug_departure_count)
                    : std::nullopt;
 
   // Source (b) - physical footprint crossing (robust, the real body over the line).
@@ -533,26 +535,28 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
 
   // Predictive fires earlier, so prefer it when present; otherwise the body-over-the-line signal
   // still onsets a shallow dodge the centerline never shows.
-  const std::string detail = fmt::format(
+  const std::string debug_detail = fmt::format(
     "departures={} candidates={} lateral_to_boundary=(L{:.2f} R{:.2f})<=trigger{:.2f} "
     "footprint_neighbours=[{}]",
-    departure_count, candidate_object_poses.size(), distance_to_left_boundary_m,
-    distance_to_right_boundary_m, predictive_lateral_trigger_distance_m_, footprint_crossing.note);
+    debug_departure_count, candidate_object_poses.size(), distance_to_left_boundary_m,
+    distance_to_right_boundary_m, predictive_lateral_trigger_distance_m_,
+    footprint_crossing.debug_note);
   if (trajectory_crossing) {
     return std::invoke([&] {
       auto resolved = resolve_crossing(
-        tracker, reference_lane, sequence_ids, *trajectory_crossing, "trajectory", detail);
-      return CrossingResult{std::move(resolved.crossing), std::move(resolved.diagnostic)};
+        tracker, reference_lane, sequence_ids, *trajectory_crossing, "trajectory", debug_detail);
+      return CrossingResult{std::move(resolved.crossing), std::move(resolved.debug_diagnostic)};
     });
   }
   if (footprint_crossing.crossing) {
     return std::invoke([&] {
       auto resolved = resolve_crossing(
-        tracker, reference_lane, sequence_ids, *footprint_crossing.crossing, "footprint", detail);
-      return CrossingResult{std::move(resolved.crossing), std::move(resolved.diagnostic)};
+        tracker, reference_lane, sequence_ids, *footprint_crossing.crossing, "footprint",
+        debug_detail);
+      return CrossingResult{std::move(resolved.crossing), std::move(resolved.debug_diagnostic)};
     });
   }
-  return {std::nullopt, fmt::format("no crossing ({})", detail)};
+  return {std::nullopt, fmt::format("no crossing ({})", debug_detail)};
 }
 
 bool LaneCrossingGeometry::compute_is_footprint_inside_reference_sequence(

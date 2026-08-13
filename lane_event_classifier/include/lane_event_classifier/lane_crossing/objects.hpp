@@ -54,7 +54,7 @@ public:
     // crossing on its own; the bracket geometry, not a speed threshold, does the discrimination.
     std::vector<geometry_msgs::msg::Pose> candidate_object_poses;
     // Human-readable breakdown of the candidate-object scan for this cycle (debug logging only).
-    std::string diagnostic;
+    std::string debug_diagnostic;
   };
 
   /** @brief Observes the candidate objects the ego might cross to avoid this cycle. */
@@ -68,10 +68,10 @@ private:
   struct LaneSequenceScan
   {
     std::vector<geometry_msgs::msg::Pose>
-      candidate_object_poses;           // touch sequence, ahead in window
-    int lane_sequence_object_count{0};  // touch the lane sequence at all (any position)
-    double nearest_ahead_m{-1.0};       // arc distance to the nearest object ahead (-1 when none)
-    double nearest_ahead_speed_mps{0.0};
+      candidate_object_poses;                 // touch sequence, ahead in window
+    int debug_lane_sequence_object_count{0};  // touch the lane sequence at all (any position)
+    double debug_nearest_ahead_m{-1.0};  // arc distance to the nearest object ahead (-1 when none)
+    double debug_nearest_ahead_speed_mps{0.0};
   };
 
   /** @brief Scans every object against the forward lane sequence and collects the candidate poses

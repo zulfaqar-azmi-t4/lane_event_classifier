@@ -90,7 +90,7 @@ private:
   LaneCrossingObjects objects_;    // perceived-object half (injected)
 
   Phase phase_{Phase::idle};
-  std::string debug_reason_;
+  mutable std::string debug_reason_;
 
   // Crossing persistence (onset in idle).
   std::optional<LaneCrossingCrossing> tracked_crossing_;

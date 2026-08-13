@@ -54,7 +54,7 @@ struct LaneCrossingObservation
   // Scope gate: the reference lane is on-route and going straight keeps the ego on-route.
   bool is_on_route_straight{false};
   // Human-readable breakdown of the crossing-detection check for this cycle (debug logging only).
-  std::string crossing_diagnostic;
+  std::string debug_crossing_diagnostic;
 };
 
 /**
@@ -85,7 +85,7 @@ private:
   struct CrossingResult
   {
     std::optional<LaneCrossingCrossing> crossing;
-    std::string diagnostic;
+    std::string debug_diagnostic;
   };
 
   /** @brief True when the reference lane is a route primitive whose straight successor is also a

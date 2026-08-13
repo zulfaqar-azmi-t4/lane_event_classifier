@@ -151,7 +151,7 @@ void IntentionalCrossingClassifier::detect_onset(
     // Per-cycle diagnostic (surfaced throttled by the node): why onset did not fire this cycle.
     debug_reason_ = fmt::format(
       "idle: on_route_straight={} | crossing: {}", observation.is_on_route_straight ? "yes" : "no",
-      observation.crossing_diagnostic);
+      observation.debug_crossing_diagnostic);
     return;
   }
   const bool confidence = has_confidence_signal(input, *observation.crossing);

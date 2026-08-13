@@ -108,7 +108,7 @@ LaneCrossingObjects::LaneSequenceScan LaneCrossingObjects::scan_lane_sequence_ob
   const auto lane_sequence_polygons = to_lane_sequence_polygons(lane_sequence);
 
   LaneSequenceScan scan;
-  double nearest_ahead_m = std::numeric_limits<double>::max();
+  double debug_nearest_ahead_m = std::numeric_limits<double>::max();
   for (const auto & object : objects) {
     // Candidate object (docs/lane_crossing.md, "Onset"): touches the reference straight sequence
     // and lies ahead within the longitudinal window. Speed is not a qualifier - the trajectory
@@ -116,14 +116,14 @@ LaneCrossingObjects::LaneSequenceScan LaneCrossingObjects::scan_lane_sequence_ob
     if (!object_touches_lane_sequence(object, lane_sequence_polygons)) {
       continue;
     }
-    ++scan.lane_sequence_object_count;
+    ++scan.debug_lane_sequence_object_count;
 
     const double arc_distance_ahead =
       arc_distance_ahead_of_ego(lane_sequence, object, ego_arc_length_m);
-    if (arc_distance_ahead > 0.0 && arc_distance_ahead < nearest_ahead_m) {
-      nearest_ahead_m = arc_distance_ahead;
-      scan.nearest_ahead_m = arc_distance_ahead;
-      scan.nearest_ahead_speed_mps = object_speed_mps(object);
+    if (arc_distance_ahead > 0.0 && arc_distance_ahead < debug_nearest_ahead_m) {
+      debug_nearest_ahead_m = arc_distance_ahead;
+      scan.debug_nearest_ahead_m = arc_distance_ahead;
+      scan.debug_nearest_ahead_speed_mps = object_speed_mps(object);
     }
     if (object_is_ahead_within_window(arc_distance_ahead)) {
       scan.candidate_object_poses.push_back(object.kinematics.initial_pose_with_covariance.pose);
@@ -153,7 +153,7 @@ LaneCrossingObjects::Result LaneCrossingObjects::observe(
   LaneSequenceScan scan =
     scan_lane_sequence_objects(lane_sequence, input.objects_ptr->objects, ego_arc_length);
 
-  if (scan.lane_sequence_object_count == 0) {
+  if (scan.debug_lane_sequence_object_count == 0) {
     return {
       {},
       fmt::format("{} objects, none touch the lane sequence", input.objects_ptr->objects.size())};
@@ -162,8 +162,8 @@ LaneCrossingObjects::Result LaneCrossingObjects::observe(
     std::move(scan.candidate_object_poses),
     fmt::format(
       "lane_sequence_objects={} candidates={} nearest_ahead={:.1f}m (speed={:.1f}mps)",
-      scan.lane_sequence_object_count, scan.candidate_object_poses.size(), scan.nearest_ahead_m,
-      scan.nearest_ahead_speed_mps)};
+      scan.debug_lane_sequence_object_count, scan.candidate_object_poses.size(),
+      scan.debug_nearest_ahead_m, scan.debug_nearest_ahead_speed_mps)};
 }
 
 }  // namespace lane_event_classifier
