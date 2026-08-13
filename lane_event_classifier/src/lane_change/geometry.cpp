@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <autoware/lanelet2_utils/kind.hpp>
+#include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/lane_change/geometry.hpp>
 
 #include <lanelet2_core/geometry/Lanelet.h>
@@ -20,7 +21,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <limits>
 #include <optional>
 #include <unordered_set>
 #include <vector>
@@ -31,50 +31,6 @@ namespace lane_event_classifier
 namespace
 {
 namespace lanelet2_utils = autoware::experimental::lanelet2_utils;
-
-// Points from nearest to ego forward, up to look_ahead_m.
-std::vector<lanelet::BasicPoint2d> forward_trajectory_points(
-  const autoware_planning_msgs::msg::Trajectory & trajectory, const lanelet::BasicPoint2d & ego,
-  double look_ahead_m)
-{
-  std::vector<lanelet::BasicPoint2d> points;
-  if (trajectory.points.empty()) {
-    return points;
-  }
-  const auto point_of = [](const auto & trajectory_point) {
-    return lanelet::BasicPoint2d{
-      trajectory_point.pose.position.x, trajectory_point.pose.position.y};
-  };
-  const auto find_nearest_index = [&]() {
-    std::size_t nearest_index = 0;
-    double nearest_distance_sq = std::numeric_limits<double>::max();
-    for (std::size_t index = 0; index < trajectory.points.size(); ++index) {
-      const double distance_sq =
-        (std::invoke(point_of, trajectory.points[index]) - ego).squaredNorm();
-      if (distance_sq < nearest_distance_sq) {
-        nearest_distance_sq = distance_sq;
-        nearest_index = index;
-      }
-    }
-    return nearest_index;
-  };
-
-  const std::size_t nearest_index = std::invoke(find_nearest_index);
-  points.reserve(trajectory.points.size() - nearest_index);
-  lanelet::BasicPoint2d previous = std::invoke(point_of, trajectory.points[nearest_index]);
-  points.push_back(previous);
-  double accumulated_length = 0.0;
-  for (std::size_t index = nearest_index + 1; index < trajectory.points.size(); ++index) {
-    const lanelet::BasicPoint2d current = std::invoke(point_of, trajectory.points[index]);
-    accumulated_length += (current - previous).norm();
-    points.push_back(current);
-    previous = current;
-    if (accumulated_length >= look_ahead_m) {
-      break;
-    }
-  }
-  return points;
-}
 
 // Outcome of scanning the trajectory for the reference lane's lateral boundary crossing.
 struct TrajectoryCrossingScan

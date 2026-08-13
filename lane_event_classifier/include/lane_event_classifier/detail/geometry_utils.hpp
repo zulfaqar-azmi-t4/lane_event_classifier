@@ -16,6 +16,7 @@
 #define LANE_EVENT_CLASSIFIER__DETAIL__GEOMETRY_UTILS_HPP_
 
 #include <autoware/lanelet2_utils/intersection.hpp>
+#include <autoware/motion_utils/trajectory/trajectory.hpp>
 #include <autoware_utils_geometry/geometry.hpp>
 #include <lane_event_classifier/types.hpp>
 
@@ -23,10 +24,7 @@
 #include <lanelet2_core/geometry/Lanelet.h>
 
 #include <algorithm>
-#include <cstddef>
-#include <functional>
 #include <iterator>
-#include <limits>
 #include <string>
 #include <vector>
 
@@ -146,42 +144,24 @@ inline std::vector<lanelet::BasicPoint2d> forward_trajectory_points(
   const autoware_planning_msgs::msg::Trajectory & trajectory, const lanelet::BasicPoint2d & ego,
   double look_ahead_m)
 {
-  std::vector<lanelet::BasicPoint2d> points;
   if (trajectory.points.empty()) {
-    return points;
+    return {};
   }
-  const auto point_of = [](const auto & trajectory_point) {
-    return lanelet::BasicPoint2d{
-      trajectory_point.pose.position.x, trajectory_point.pose.position.y};
-  };
-  const auto find_nearest_index = [&]() {
-    std::size_t nearest_index = 0;
-    double nearest_distance_sq = std::numeric_limits<double>::max();
-    for (std::size_t index = 0; index < trajectory.points.size(); ++index) {
-      const double distance_sq =
-        (std::invoke(point_of, trajectory.points[index]) - ego).squaredNorm();
-      if (distance_sq < nearest_distance_sq) {
-        nearest_distance_sq = distance_sq;
-        nearest_index = index;
-      }
-    }
-    return nearest_index;
-  };
+  geometry_msgs::msg::Point ego_point;
+  ego_point.x = ego.x();
+  ego_point.y = ego.y();
+  const auto nearest_index = autoware::motion_utils::findNearestIndex(trajectory.points, ego_point);
+  const auto cropped = autoware::motion_utils::cropPoints(
+    trajectory.points, ego_point, nearest_index, look_ahead_m, 0.0);
 
-  const std::size_t nearest_index = std::invoke(find_nearest_index);
-  points.reserve(trajectory.points.size() - nearest_index);
-  lanelet::BasicPoint2d previous = std::invoke(point_of, trajectory.points[nearest_index]);
-  points.push_back(previous);
-  double accumulated_length = 0.0;
-  for (std::size_t index = nearest_index + 1; index < trajectory.points.size(); ++index) {
-    const lanelet::BasicPoint2d current = std::invoke(point_of, trajectory.points[index]);
-    accumulated_length += (current - previous).norm();
-    points.push_back(current);
-    previous = current;
-    if (accumulated_length >= look_ahead_m) {
-      break;
-    }
-  }
+  std::vector<lanelet::BasicPoint2d> points;
+  points.reserve(cropped.size());
+  std::transform(
+    cropped.cbegin(), cropped.cend(), std::back_inserter(points),
+    [](const auto & trajectory_point) {
+      return lanelet::BasicPoint2d{
+        trajectory_point.pose.position.x, trajectory_point.pose.position.y};
+    });
   return points;
 }
 
