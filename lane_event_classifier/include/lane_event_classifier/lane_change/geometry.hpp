@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CHANGE__GEOMETRY_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CHANGE__GEOMETRY_HPP_
 
+#include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
 
@@ -67,10 +68,6 @@ public:
     const LaneTracker & tracker, const LaneEventInput & input) const;
 
 private:
-  /** @brief True when the reference lane is on the route and continues straight onto the route. */
-  [[nodiscard]] static bool is_driving_straight_stays_on_route(
-    const LaneTracker & tracker, lanelet::Id reference_lane_id);
-
   /** @brief The valid lane-change crossing of the trajectory over the reference boundary, if any.
    * @param trajectory_points Forward trajectory samples (computed once per cycle by observe). */
   [[nodiscard]] std::optional<LaneChangeCrossing> compute_crossing(
@@ -99,6 +96,8 @@ private:
     const std::vector<lanelet::Id> & footprint_ids);
 
   double crossing_look_ahead_m_;  // arc length ahead scanned for a trajectory crossing
+
+  mutable StraightLaneSequenceCache lane_sequence_cache_;
 };
 
 }  // namespace lane_event_classifier

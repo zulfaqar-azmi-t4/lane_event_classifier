@@ -111,23 +111,14 @@ public:
   /** @brief Ids of the given lane's longitudinal next lanes (routing following). */
   [[nodiscard]] std::vector<lanelet::Id> next_lane_ids(lanelet::Id lane_id) const;
 
-  /** @brief Lane ids reachable from the given lane by driving straight (fore/aft) within
-   * look_ahead_m, including the lane itself.
-   *
-   * Memoized on (lane id, look_ahead_m): the routing-graph expansion is skipped while the reference
-   * lane is unchanged (the common case), and recomputed only when the queried lane changes or the
-   * map is replaced. The returned reference is valid until the next call with different arguments.
-   */
-  [[nodiscard]] const std::unordered_set<lanelet::Id> & straight_lane_sequence_ids(
-    const lanelet::ConstLanelet & lane, double look_ahead_m) const;
-
   /** @brief The ordered, forward-only on-route straight sequence starting at the given lane: the
    * lane itself followed by each route-primitive straight successor, accumulating at least
    * downstream_length_m of lane length beyond the starting lane.
    *
-   * Unlike the fore/aft membership set of straight_lane_sequence_ids, this is a forward-only,
-   * route-filtered, *ordered* run of lanelets, suitable for concatenating boundaries or measuring
-   * forward arc length along the lane sequence. Returned by value; empty if the lane id is unknown.
+   * Unlike the fore/aft membership set of get_straight_lane_sequence_ids
+   * (detail/lane_sequence.hpp), this is a forward-only, route-filtered, *ordered* run of lanelets,
+   * suitable for concatenating boundaries or measuring forward arc length along the lane sequence.
+   * Returned by value; empty if the lane id is unknown.
    */
   [[nodiscard]] lanelet::ConstLanelets get_forward_route_lane_sequence(
     lanelet::Id reference_lane_id, double downstream_length_m) const;
@@ -137,12 +128,6 @@ public:
    * O(1) lookup against the route-primitive set cached in update(); the set is rebuilt only when
    * the route changes (new uuid == new route_ptr). */
   [[nodiscard]] bool is_route_primitive(lanelet::Id lane_id) const;
-
-  /** @brief The cached set of route-preferred primitive ids for the current route. */
-  [[nodiscard]] const std::unordered_set<lanelet::Id> & route_primitive_ids() const
-  {
-    return route_primitive_ids_;
-  }
 
   /** @brief Lanelet the ego centre was found in on the last update() (InvalId if none/held). */
   [[nodiscard]] lanelet::Id debug_last_selected_lane_id() const
@@ -193,12 +178,6 @@ private:
   autoware_planning_msgs::msg::LaneletRoute::ConstSharedPtr cached_route_ptr_;
 
   std::unordered_set<lanelet::Id> route_primitive_ids_;
-
-  // Straight-lane-sequence memo (mutable: filled lazily by the const straight_lane_sequence_ids
-  // query).
-  mutable lanelet::Id cached_lane_sequence_source_id_{lanelet::InvalId};
-  mutable double cached_lane_sequence_look_ahead_m_{-1.0};
-  mutable std::unordered_set<lanelet::Id> cached_lane_sequence_ids_;
 };
 
 }  // namespace lane_event_classifier

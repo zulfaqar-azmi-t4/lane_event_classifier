@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CROSSING__GEOMETRY_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CROSSING__GEOMETRY_HPP_
 
+#include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
 
@@ -88,11 +89,6 @@ private:
     std::string debug_diagnostic;
   };
 
-  /** @brief True when the reference lane is a route primitive whose straight successor is also a
-   * route primitive, so going straight stays on-route (the scope gate). */
-  [[nodiscard]] static bool driving_straight_stays_on_route(
-    const LaneTracker & tracker, lanelet::Id reference_lane_id);
-
   /** @brief The valid lane-crossing crossing over the reference boundary (with its diagnostic).
    * Two sources, both gated on a candidate object to go around: (a) predictive - the planned
    * trajectory departs the lane sequence around the object (crosses a boundary out before it, back
@@ -149,6 +145,8 @@ private:
                                                   // to the object it dodges, rather than any
                                                   // candidate merely qualifying within the far
                                                   // longer object_longitudinal_window_m
+
+  mutable StraightLaneSequenceCache lane_sequence_cache_;
 };
 
 }  // namespace lane_event_classifier

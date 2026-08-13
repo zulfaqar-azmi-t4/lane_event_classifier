@@ -15,7 +15,6 @@
 #include <autoware/lanelet2_utils/intersection.hpp>
 #include <autoware/lanelet2_utils/nn_search.hpp>
 #include <lane_event_classifier/detail/geometry_utils.hpp>
-#include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/lane_following/checker.hpp>
 #include <magic_enum.hpp>
 
@@ -145,20 +144,6 @@ LaneFollowingChecker::LaneFollowingChecker(LaneFollowingConfig config) : config_
 {
 }
 
-const std::unordered_set<lanelet::Id> & LaneFollowingChecker::connected_sequence_ids(
-  const lanelet::ConstLanelet & reference_lane,
-  const lanelet::routing::RoutingGraphConstPtr & routing_graph_ptr) const
-{
-  if (routing_graph_ptr == cached_graph_ptr_ && reference_lane.id() == cached_reference_lane_id_) {
-    return cached_sequence_ids_;
-  }
-  cached_graph_ptr_ = routing_graph_ptr;
-  cached_reference_lane_id_ = reference_lane.id();
-  cached_sequence_ids_ = get_straight_lane_sequence_ids(
-    reference_lane, routing_graph_ptr, config_.connected_sequence_length_m);
-  return cached_sequence_ids_;
-}
-
 LaneFollowingResult LaneFollowingChecker::evaluate(
   const LaneTracker & tracker, const lanelet::BasicPoint2d & ego_point) const
 {
@@ -172,7 +157,8 @@ LaneFollowingResult LaneFollowingChecker::evaluate(
     return {true, LaneFollowingReason::no_reference_lane};
   }
   const auto & reference_lane = *reference_lane_opt;
-  const auto & sequence_ids = connected_sequence_ids(reference_lane, tracker.routing_graph_ptr());
+  const auto & sequence_ids = lane_sequence_cache_.get(
+    reference_lane, tracker.routing_graph_ptr(), config_.connected_sequence_length_m);
 
   // inside_connected_sequence (docs/lane_following.md, "Inside the connected sequence").
   if (is_point_inside_any(lanelet_map_ptr, sequence_ids, ego_point)) {

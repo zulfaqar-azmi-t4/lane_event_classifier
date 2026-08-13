@@ -106,19 +106,6 @@ LaneChangeObservation LaneChangeGeometry::observe(
   return observation;
 }
 
-bool LaneChangeGeometry::is_driving_straight_stays_on_route(
-  const LaneTracker & tracker, lanelet::Id reference_lane_id)
-{
-  if (!tracker.is_route_primitive(reference_lane_id)) {
-    return false;
-  }
-
-  const auto next_ids = tracker.next_lane_ids(reference_lane_id);
-  return std::any_of(next_ids.cbegin(), next_ids.cend(), [&tracker](const lanelet::Id next_id) {
-    return tracker.is_route_primitive(next_id);
-  });
-}
-
 std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
   const LaneTracker & tracker, const LaneEventInput & input,
   const std::vector<lanelet::BasicPoint2d> & trajectory_points) const
@@ -131,7 +118,7 @@ std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
   const auto reference_lane_id = reference.reference_lane_id;
 
   // Straight-on-route skip; see docs/lane_change.md, "Finding a crossing".
-  if (is_driving_straight_stays_on_route(tracker, reference_lane_id)) {
+  if (driving_straight_stays_on_route(tracker, reference_lane_id)) {
     return std::nullopt;
   }
 
@@ -147,7 +134,7 @@ std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
   }
 
   const auto & lane_sequence =
-    tracker.straight_lane_sequence_ids(reference_lane, crossing_look_ahead_m_);
+    lane_sequence_cache_.get(reference_lane, tracker.routing_graph_ptr(), crossing_look_ahead_m_);
 
   const auto [target_lane_id, crossing_point] =
     scan_trajectory_for_crossing(tracker, lane_sequence, trajectory_points);

@@ -59,6 +59,41 @@ namespace lane_event_classifier
   return ids;
 }
 
+/**
+ * @brief Memoizes get_straight_lane_sequence_ids() while the queried lane and routing graph are
+ * unchanged.
+ *
+ * Each owner queries at its own fixed reach_m, so the cache key is (lane id, routing graph
+ * identity) only, mirroring LaneFollowingChecker's original memo. A plain value member, one per
+ * owning class, rather than a shared cache: two owners with different reach_m values would thrash
+ * a single shared slot every call.
+ */
+class StraightLaneSequenceCache
+{
+public:
+  /** @brief Returns the memoized set, recomputing it only on a lane-id or routing-graph change.
+   *
+   * Non-const: the owner holds this cache as a `mutable` member, so the constness of mutating a
+   * cache lives at the one point it is stored, not spread across each field in here. */
+  [[nodiscard]] const std::unordered_set<lanelet::Id> & get(
+    const lanelet::ConstLanelet & lane,
+    const lanelet::routing::RoutingGraphConstPtr & routing_graph, double reach_m)
+  {
+    if (routing_graph == cached_graph_ptr_ && lane.id() == cached_lane_id_) {
+      return cached_ids_;
+    }
+    cached_graph_ptr_ = routing_graph;
+    cached_lane_id_ = lane.id();
+    cached_ids_ = get_straight_lane_sequence_ids(lane, routing_graph, reach_m);
+    return cached_ids_;
+  }
+
+private:
+  lanelet::routing::RoutingGraphConstPtr cached_graph_ptr_;
+  lanelet::Id cached_lane_id_{lanelet::InvalId};
+  std::unordered_set<lanelet::Id> cached_ids_;
+};
+
 }  // namespace lane_event_classifier
 
 #endif  // LANE_EVENT_CLASSIFIER__DETAIL__LANE_SEQUENCE_HPP_

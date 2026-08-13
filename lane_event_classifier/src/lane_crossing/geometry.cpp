@@ -484,8 +484,8 @@ LaneCrossingObservation LaneCrossingGeometry::observe(
   const double boundary_look_ahead_m =
     trajectory_points.size() >= 2 ? polyline_arc_length(trajectory_points) : crossing_look_ahead_m_;
   const auto footprint_ids = tracker.footprint_lane_ids(input.footprint);
-  const auto & sequence_ids =
-    tracker.straight_lane_sequence_ids(*reference_lane_opt, crossing_look_ahead_m_);
+  const auto & sequence_ids = lane_sequence_cache_.get(
+    *reference_lane_opt, tracker.routing_graph_ptr(), crossing_look_ahead_m_);
 
   observation.is_on_route_straight = driving_straight_stays_on_route(tracker, reference_lane_id);
   auto crossing_result = compute_crossing(
@@ -498,18 +498,6 @@ LaneCrossingObservation LaneCrossingGeometry::observe(
   observation.full_entry_lane_id =
     compute_full_entry_lane_id(tracker, input, sequence_ids, footprint_ids);
   return observation;
-}
-
-bool LaneCrossingGeometry::driving_straight_stays_on_route(
-  const LaneTracker & tracker, lanelet::Id reference_lane_id)
-{
-  if (!tracker.is_route_primitive(reference_lane_id)) {
-    return false;
-  }
-  const auto next_ids = tracker.next_lane_ids(reference_lane_id);
-  return std::any_of(next_ids.cbegin(), next_ids.cend(), [&tracker](const lanelet::Id next_id) {
-    return tracker.is_route_primitive(next_id);
-  });
 }
 
 LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(

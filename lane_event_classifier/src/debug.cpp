@@ -50,22 +50,11 @@ const char * state_to_string(uint8_t state)
 LaneEventClassifierDebug::LaneEventClassifierDebug(rclcpp::Node & node)
 : logger_{node.get_logger()}, clock_{node.get_clock()}
 {
-  pub_markers_ =
-    node.create_publisher<visualization_msgs::msg::MarkerArray>("~/debug/markers", rclcpp::QoS{1});
   pub_processing_time_ = node.create_publisher<autoware_internal_debug_msgs::msg::Float64Stamped>(
     "~/debug/processing_time_ms", rclcpp::QoS{1});
   pub_processing_time_text_ =
     node.create_publisher<autoware_internal_debug_msgs::msg::StringStamped>(
       "~/debug/processing_time_text", rclcpp::QoS{1});
-}
-
-void LaneEventClassifierDebug::publish_markers(
-  const visualization_msgs::msg::MarkerArray & markers) const
-{
-  if (markers.markers.empty()) {
-    return;
-  }
-  pub_markers_->publish(markers);
 }
 
 void LaneEventClassifierDebug::log_reset(const std::string & reason) const

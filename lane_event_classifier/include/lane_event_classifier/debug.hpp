@@ -24,7 +24,6 @@
 
 #include <autoware_internal_debug_msgs/msg/float64_stamped.hpp>
 #include <autoware_internal_debug_msgs/msg/string_stamped.hpp>
-#include <visualization_msgs/msg/marker_array.hpp>
 
 #include <lanelet2_core/primitives/Lanelet.h>
 
@@ -43,12 +42,6 @@ class LaneEventClassifierDebug
 {
 public:
   explicit LaneEventClassifierDebug(rclcpp::Node & node);
-
-  /**
-   * @brief Publishes the collected classifier markers (no-op if empty).
-   * @param markers Marker array to publish.
-   */
-  void publish_markers(const visualization_msgs::msg::MarkerArray & markers) const;
 
   /**
    * @brief Logs a tracking-state reset (see reset_tracking_state) with its cause.
@@ -89,7 +82,6 @@ private:
   rclcpp::Logger logger_;
   rclcpp::Clock::SharedPtr clock_;
 
-  rclcpp::Publisher<visualization_msgs::msg::MarkerArray>::SharedPtr pub_markers_;
   rclcpp::Publisher<autoware_internal_debug_msgs::msg::Float64Stamped>::SharedPtr
     pub_processing_time_;
   rclcpp::Publisher<autoware_internal_debug_msgs::msg::StringStamped>::SharedPtr

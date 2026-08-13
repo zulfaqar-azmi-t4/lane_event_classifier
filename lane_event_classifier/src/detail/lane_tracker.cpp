@@ -50,10 +50,6 @@ tl::expected<void, std::string> LaneTracker::set_lanelet_map(
   std::tie(routing_graph_ptr_, traffic_rules_ptr_) =
     autoware::experimental::lanelet2_utils::instantiate_routing_graph_and_traffic_rules(
       lanelet_map_ptr_);
-  // The routing graph changed, so any memoized straight lane sequence is stale.
-  cached_lane_sequence_source_id_ = lanelet::InvalId;
-  cached_lane_sequence_look_ahead_m_ = -1.0;
-  cached_lane_sequence_ids_.clear();
   return {};
 }
 
@@ -144,25 +140,6 @@ std::vector<lanelet::Id> LaneTracker::next_lane_ids(lanelet::Id lane_id) const
     ids.push_back(next_lane.id());
   }
   return ids;
-}
-
-const std::unordered_set<lanelet::Id> & LaneTracker::straight_lane_sequence_ids(
-  const lanelet::ConstLanelet & lane, double look_ahead_m) const
-{
-  // Reuse the memoized lane sequence while the queried lane and look-ahead are unchanged;
-  // look_ahead_m is a fixed configuration value, so the exact comparison always holds on a cache
-  // hit.
-  if (
-    lane.id() == cached_lane_sequence_source_id_ &&
-    look_ahead_m == cached_lane_sequence_look_ahead_m_) {
-    return cached_lane_sequence_ids_;
-  }
-
-  cached_lane_sequence_ids_ =
-    get_straight_lane_sequence_ids(lane, routing_graph_ptr_, look_ahead_m);
-  cached_lane_sequence_source_id_ = lane.id();
-  cached_lane_sequence_look_ahead_m_ = look_ahead_m;
-  return cached_lane_sequence_ids_;
 }
 
 lanelet::ConstLanelets LaneTracker::get_forward_route_lane_sequence(

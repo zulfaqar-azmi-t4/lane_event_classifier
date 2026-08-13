@@ -17,15 +17,11 @@
 
 #include <lane_event_classifier/types.hpp>
 
-#include <visualization_msgs/msg/marker_array.hpp>
-
 #include <cstdint>
 #include <string>
 
 namespace lane_event_classifier
 {
-
-class LaneTracker;
 
 /** @brief Interface for lane-event classifiers.
  *
@@ -54,12 +50,6 @@ public:
 
   /** @brief One-line reason for the most recent state transition (debug/logging only). */
   [[nodiscard]] virtual std::string debug_reason() const { return {}; }
-
-  /** @brief Appends this classifier's debug markers to the given array. */
-  virtual void fill_debug_markers(
-    const LaneEventInput &, const LaneTracker &, visualization_msgs::msg::MarkerArray &) const
-  {
-  }
 };
 
 }  // namespace lane_event_classifier

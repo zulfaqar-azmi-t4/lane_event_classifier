@@ -15,6 +15,7 @@
 #include "synthetic_lanelet_maps.hpp"
 
 #include <lane_event_classifier/detail/geometry_utils.hpp>
+#include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 
 #include <gtest/gtest.h>
@@ -265,13 +266,10 @@ TEST(LaneTrackerTest, straight_lane_sequence_spans_connected_lanes)
 
   const auto lane_a = tracker.get_lanelet(id_a);
   ASSERT_TRUE(lane_a.has_value());
-  const auto & sequence_ids = tracker.straight_lane_sequence_ids(*lane_a, 100.0);
+  const auto sequence_ids =
+    get_straight_lane_sequence_ids(*lane_a, tracker.routing_graph_ptr(), 100.0);
   EXPECT_NE(sequence_ids.count(id_a), 0u);
   EXPECT_NE(sequence_ids.count(id_b), 0u);
-
-  // A repeat query with the same arguments returns the memoized set unchanged.
-  const auto & cached_ids = tracker.straight_lane_sequence_ids(*lane_a, 100.0);
-  EXPECT_EQ(cached_ids, sequence_ids);
 }
 
 TEST(LaneTrackerTest, route_primitive_cache_tracks_current_route)
@@ -284,7 +282,6 @@ TEST(LaneTrackerTest, route_primitive_cache_tracks_current_route)
   [[maybe_unused]] const auto update_result = tracker.update(make_input({id_a}, 5.0, 0.0, 0, 0));
   EXPECT_TRUE(tracker.is_route_primitive(id_a));
   EXPECT_FALSE(tracker.is_route_primitive(id_b));
-  EXPECT_NE(tracker.route_primitive_ids().count(id_a), 0u);
 }
 
 // The step of a braking cycle was travelled at the previous speed, not the one reported now, so

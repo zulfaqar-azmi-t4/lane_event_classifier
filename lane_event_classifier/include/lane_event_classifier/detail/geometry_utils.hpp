@@ -17,6 +17,7 @@
 
 #include <autoware/motion_utils/trajectory/trajectory.hpp>
 #include <autoware_utils_geometry/geometry.hpp>
+#include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
 
 #include <lanelet2_core/Attribute.h>
@@ -111,6 +112,25 @@ inline bool is_reposition_jump(
   // Braking reports a speed the step just taken predates, so the faster sample explains it.
   const double explaining_speed_mps = std::max(previous.speed_mps, current.speed_mps);
   return measured_step_m > explaining_speed_mps * elapsed_s + noise_margin_m;
+}
+
+/** @brief True when the reference lane is a route primitive whose straight successor is also a
+ * route primitive, so going straight stays on-route.
+ * @param reference_lane_id Lane id to test.
+ *
+ * Shared by the lane-change and lane-crossing geometry layers: the exact complement of each other's
+ * scope condition, so the two classifiers never double-classify.
+ */
+inline bool driving_straight_stays_on_route(
+  const LaneTracker & tracker, lanelet::Id reference_lane_id)
+{
+  if (!tracker.is_route_primitive(reference_lane_id)) {
+    return false;
+  }
+  const auto next_ids = tracker.next_lane_ids(reference_lane_id);
+  return std::any_of(next_ids.cbegin(), next_ids.cend(), [&tracker](const lanelet::Id next_id) {
+    return tracker.is_route_primitive(next_id);
+  });
 }
 
 /**

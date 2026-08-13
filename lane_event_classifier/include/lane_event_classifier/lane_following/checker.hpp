@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_FOLLOWING__CHECKER_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_FOLLOWING__CHECKER_HPP_
 
+#include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_event_classifier_parameters.hpp>
 
@@ -23,7 +24,6 @@
 #include <lanelet2_routing/RoutingGraph.h>
 
 #include <string_view>
-#include <unordered_set>
 
 namespace lane_event_classifier
 {
@@ -64,21 +64,9 @@ public:
     const LaneTracker & tracker, const lanelet::BasicPoint2d & ego_point) const;
 
 private:
-  /**
-   * @brief Connected-lane-sequence ids for the reference lane, memoized while it and the graph are
-   * unchanged.
-   * @param reference_lane The reference lanelet.
-   * @param routing_graph_ptr Routing graph to traverse.
-   */
-  [[nodiscard]] const std::unordered_set<lanelet::Id> & connected_sequence_ids(
-    const lanelet::ConstLanelet & reference_lane,
-    const lanelet::routing::RoutingGraphConstPtr & routing_graph_ptr) const;
-
   LaneFollowingConfig config_{};
 
-  mutable lanelet::routing::RoutingGraphConstPtr cached_graph_ptr_;
-  mutable lanelet::Id cached_reference_lane_id_{lanelet::InvalId};
-  mutable std::unordered_set<lanelet::Id> cached_sequence_ids_;
+  mutable StraightLaneSequenceCache lane_sequence_cache_;
 };
 
 }  // namespace lane_event_classifier
