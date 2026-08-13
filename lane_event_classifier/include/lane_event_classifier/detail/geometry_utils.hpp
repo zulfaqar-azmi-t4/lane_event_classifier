@@ -15,7 +15,6 @@
 #ifndef LANE_EVENT_CLASSIFIER__DETAIL__GEOMETRY_UTILS_HPP_
 #define LANE_EVENT_CLASSIFIER__DETAIL__GEOMETRY_UTILS_HPP_
 
-#include <autoware/lanelet2_utils/intersection.hpp>
 #include <autoware/motion_utils/trajectory/trajectory.hpp>
 #include <autoware_utils_geometry/geometry.hpp>
 #include <lane_event_classifier/types.hpp>
@@ -80,22 +79,6 @@ inline bool is_virtual_linestring(const lanelet::ConstLineString3d & bound)
   // std::string default: a const char* default would make Attribute::as<> compare by pointer.
   return bound.attributeOr(lanelet::AttributeName::Type, std::string{}) ==
          lanelet::AttributeValueString::Virtual;
-}
-
-/**
- * @brief Returns true if the lane is a turn-direction ("left"/"right") or intersection lanelet.
- * @param lane Lanelet to test.
- *
- * Shared onset exemption for both the lane-change and lane-crossing classifiers: turning out of a
- * turn/intersection lane is never a lane event.
- */
-inline bool is_turn_direction_lane(const lanelet::ConstLanelet & lane)
-{
-  if (autoware::experimental::lanelet2_utils::is_intersection_lanelet(lane)) {
-    return true;
-  }
-  const auto turn_direction = lane.attributeOr("turn_direction", std::string{});
-  return turn_direction == "left" || turn_direction == "right";
 }
 
 /** @brief Ego pose, speed and stamp of one cycle, as used to detect a localization discontinuity.

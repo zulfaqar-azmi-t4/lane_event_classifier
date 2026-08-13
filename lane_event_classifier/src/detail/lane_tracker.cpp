@@ -15,6 +15,8 @@
 #include <autoware/lanelet2_utils/conversion.hpp>
 #include <autoware/lanelet2_utils/intersection.hpp>
 #include <autoware/lanelet2_utils/kind.hpp>
+#include <autoware/lanelet2_utils/nn_search.hpp>
+#include <autoware/lanelet2_utils/topology.hpp>
 #include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
@@ -25,7 +27,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <limits>
 #include <optional>
 #include <string>
 #include <tuple>
@@ -139,7 +140,7 @@ std::vector<lanelet::Id> LaneTracker::next_lane_ids(lanelet::Id lane_id) const
   if (!routing_graph_ptr_ || !lane) {
     return ids;
   }
-  for (const auto & next_lane : routing_graph_ptr_->following(*lane)) {
+  for (const auto & next_lane : lanelet2_utils::following_lanelets(*lane, routing_graph_ptr_)) {
     ids.push_back(next_lane.id());
   }
   return ids;
@@ -220,16 +221,8 @@ bool LaneTracker::is_route_primitive(lanelet::Id lane_id) const
 bool LaneTracker::is_lane_directly_connected(
   lanelet::Id from_lane_id, lanelet::Id candidate_lane_id) const
 {
-  if (!routing_graph_ptr_ || !lanelet_exists(from_lane_id)) {
-    return false;
-  }
-  const auto from_lane = lanelet_map_ptr_->laneletLayer.get(from_lane_id);
-  const auto next_lanes = routing_graph_ptr_->following(from_lane);
-  return std::any_of(
-    next_lanes.cbegin(), next_lanes.cend(),
-    [candidate_lane_id](const lanelet::ConstLanelet & next_lane) {
-      return next_lane.id() == candidate_lane_id;
-    });
+  const auto next_ids = next_lane_ids(from_lane_id);
+  return std::find(next_ids.cbegin(), next_ids.cend(), candidate_lane_id) != next_ids.cend();
 }
 
 std::optional<lanelet::Id> LaneTracker::select_current_lane_id(const LaneEventInput & input) const
@@ -238,6 +231,8 @@ std::optional<lanelet::Id> LaneTracker::select_current_lane_id(const LaneEventIn
   const lanelet::BasicPoint2d ego_pt{odom_pos.x, odom_pos.y};
 
   // Prefer a route primitive the ego is inside; R-tree query avoids a whole-map scan each cycle.
+  // Not lanelet2_utils::get_road_lanelets_at: that filters by subtype=="road", excluding any
+  // lanelet without that attribute, whereas the ego's actual containing lane must always win.
   const lanelet::BoundingBox2d query_box(ego_pt, ego_pt);
   std::optional<lanelet::Id> off_route_lane_id;
   for (const auto & candidate_lane : lanelet_map_ptr_->laneletLayer.search(query_box)) {
@@ -256,21 +251,17 @@ std::optional<lanelet::Id> LaneTracker::select_current_lane_id(const LaneEventIn
   }
 
   // Fall back to the nearest route primitive (ego between lanelets, e.g. at a boundary).
-  std::optional<lanelet::Id> nearest_lane_id;
-  double min_dist_to_nearest_lane = std::numeric_limits<double>::max();
-  for (const auto & segment : input.route_ptr->segments) {
-    const auto candidate_lane_id = static_cast<lanelet::Id>(segment.preferred_primitive.id);
-    if (!lanelet_exists(candidate_lane_id)) {
-      continue;
-    }
-    const auto candidate_lane = lanelet_map_ptr_->laneletLayer.get(candidate_lane_id);
-    const double dist_to_candidate = lanelet::geometry::distance2d(candidate_lane, ego_pt);
-    if (dist_to_candidate < min_dist_to_nearest_lane) {
-      min_dist_to_nearest_lane = dist_to_candidate;
-      nearest_lane_id = candidate_lane_id;
+  std::vector<lanelet::Id> existing_route_ids;
+  existing_route_ids.reserve(route_primitive_ids_.size());
+  for (const auto id : route_primitive_ids_) {
+    if (lanelet_exists(id)) {
+      existing_route_ids.push_back(id);
     }
   }
-  return nearest_lane_id;
+  const auto route_lanelets = lanelet2_utils::from_ids(lanelet_map_ptr_, existing_route_ids);
+  const auto nearest_lane =
+    lanelet2_utils::get_closest_lanelet(route_lanelets, input.odometry_ptr->pose.pose);
+  return nearest_lane ? std::optional<lanelet::Id>{nearest_lane->id()} : std::nullopt;
 }
 
 tl::expected<void, std::string> LaneTracker::update(const LaneEventInput & input)

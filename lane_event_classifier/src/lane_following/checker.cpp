@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <autoware/lanelet2_utils/intersection.hpp>
-#include <autoware/lanelet2_utils/kind.hpp>
+#include <autoware/lanelet2_utils/nn_search.hpp>
 #include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/detail/lane_sequence.hpp>
 #include <lane_event_classifier/lane_following/checker.hpp>
@@ -21,7 +21,6 @@
 
 #include <lanelet2_core/geometry/Lanelet.h>
 #include <lanelet2_core/geometry/LineString.h>
-#include <lanelet2_core/primitives/BoundingBox.h>
 
 #include <algorithm>
 #include <limits>
@@ -61,13 +60,7 @@ bool is_point_within_tolerance_of_any(
 bool is_point_in_road_shoulder(
   const lanelet::LaneletMapPtr & map, const lanelet::BasicPoint2d & point)
 {
-  const lanelet::BoundingBox2d query_box(point, point);
-  for (const auto & lane : map->laneletLayer.search(query_box)) {
-    if (lanelet2_utils::is_shoulder_lane(lane) && lanelet::geometry::inside(lane, point)) {
-      return true;
-    }
-  }
-  return false;
+  return !lanelet2_utils::get_shoulder_lanelets_at(map, point.x(), point.y()).empty();
 }
 
 // turn_lane_exempt: ego is in a turn / intersection lane, either the reference lane or a sequence

@@ -519,7 +519,7 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
 
   // Onset exemption (docs/lane_crossing.md, "Exemptions"): a turn-direction / intersection
   // reference lane. Going out of lane there is turning, not dodging, so no crossing is possible.
-  if (is_turn_direction_lane(reference_lane)) {
+  if (tracker.reference_lane().is_reference_lane_intersection) {
     return {std::nullopt, "exempt: reference lane is a turn/intersection lane"};
   }
 
