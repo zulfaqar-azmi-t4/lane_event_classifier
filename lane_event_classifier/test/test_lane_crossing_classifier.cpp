@@ -238,7 +238,7 @@ public:
       true, config, tracker_,
       LaneCrossingGeometry{
         config.crossing_look_ahead_m, config.footprint_boundary_overshoot_m,
-        config.predictive_lateral_trigger_distance_m},
+        config.predictive_lateral_trigger_distance_m, config.footprint_crossing_object_proximity_m},
       LaneCrossingObjects{config.object_longitudinal_window_m}}
   {
     const auto result = tracker_.set_lanelet_map(map);
@@ -280,6 +280,7 @@ LaneCrossingConfig make_config()
   config.crossing_persist_duration_s = 0.3;
   config.crossing_position_tolerance_m = 2.0;
   config.footprint_boundary_overshoot_m = 0.5;
+  config.footprint_crossing_object_proximity_m = 10.0;
   config.settle_confirm_duration_s = 0.5;
   config.confidence_factor = 0.5;
   config.object_longitudinal_window_m = 50.0;
@@ -626,6 +627,37 @@ TEST(LaneCrossingTest, footprint_over_boundary_is_a_crossing)
   }
   EXPECT_TRUE(became_crossing)
     << "the body poking past the boundary is a crossing even on an in-lane path";
+}
+
+// Proximity guard: the body pokes over the boundary, and a candidate object qualifies (touches the
+// sequence, ahead within object_longitudinal_window_m) but sits far from the poking corner. Without
+// tying the footprint source to the object it dodges, any qualifying object anywhere in the window
+// would onset a crossing off an unrelated body overhang (e.g. cornering at a curve).
+TEST(LaneCrossingTest, footprint_over_boundary_with_distant_object_is_not_a_crossing)
+{
+  auto map = load_test_map();
+  ASSERT_TRUE(static_cast<bool>(map));
+
+  Simulator sim{map, make_config()};
+  const std::vector<lanelet::Id> route{route_ids().begin(), route_ids().end()};
+
+  const auto straight_trajectory = build_lane_trajectory(map, {47}, 0.3, 0.9, 20);
+  const auto ego_in_47 = straight_trajectory.front();
+  const auto footprint = build_straddle_footprint(map, 0.6, 1.0);  // 1.0 m into 48, > 0.5 threshold
+  const auto object_point = point_at_fraction(centerline_points(map, 47), 0.95);  // far ahead
+  const auto objects =
+    test_maps::make_objects({test_maps::make_object(object_point.x(), object_point.y())});
+
+  int64_t time_ms = 0;
+  for (int cycle = 0; cycle < 10; ++cycle) {
+    const auto [sec, nsec] = stamp_from_ms(time_ms);
+    const uint8_t state = sim.step(test_maps::make_trajectory_input(
+      route, ego_in_47, sec, nsec, straight_trajectory, footprint, TurnIndicatorsReport::DISABLE,
+      objects));
+    EXPECT_NE(state, DS::INTENTIONAL_LANE_CROSSING)
+      << "a body overhang far from any candidate object is not a crossing";
+    time_ms += 100;
+  }
 }
 
 // Cornering guard: a body that only slightly overhangs the boundary (below

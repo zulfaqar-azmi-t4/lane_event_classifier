@@ -108,6 +108,12 @@ lane_event_classifier:
       description: Minimum distance an ego footprint corner must poke past the reference lane boundary into a lane outside the sequence for the physical (footprint) crossing source to count, so a slight overhang from cornering is not read as a crossing
       validation:
         gt<>: [0.0]
+    footprint_crossing_object_proximity_m:
+      type: double
+      default_value: 10.0
+      description: Maximum distance from the poking footprint corner to a candidate object for the physical (footprint) crossing source to onset, so the crossing is tied to the object it dodges rather than any candidate merely qualifying within the far longer object_longitudinal_window_m
+      validation:
+        gt<>: [0.0]
     settle_confirm_duration_s:
       type: double
       default_value: 0.7
