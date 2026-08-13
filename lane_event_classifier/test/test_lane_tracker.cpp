@@ -14,6 +14,7 @@
 
 #include "synthetic_lanelet_maps.hpp"
 
+#include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 
 #include <gtest/gtest.h>
@@ -144,9 +145,10 @@ TEST(LaneTrackerTest, hold_freezes_reference_until_released)
   tracker.hold_reference_lane();
   EXPECT_TRUE(tracker.is_reference_lane_held());
 
-  // While held the reference lane is frozen even as the ego advances into lane_b.
-  [[maybe_unused]] const auto update_result_2 =
-    tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
+  // While held the reference lane is frozen even as the ego advances into lane_b. A hold is the
+  // normal state during an event, so the update still succeeds; the node logs only real failures.
+  const auto update_result_2 = tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
+  EXPECT_TRUE(update_result_2.has_value());
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
   // Releasing clears the reference so the next update re-anchors to the ego's current lane.
@@ -283,6 +285,37 @@ TEST(LaneTrackerTest, route_primitive_cache_tracks_current_route)
   EXPECT_TRUE(tracker.is_route_primitive(id_a));
   EXPECT_FALSE(tracker.is_route_primitive(id_b));
   EXPECT_NE(tracker.route_primitive_ids().count(id_a), 0u);
+}
+
+// The step of a braking cycle was travelled at the previous speed, not the one reported now, so
+// judging it against the current speed alone reads hard braking as a localization jump.
+TEST(RepositionJumpTest, braking_between_cycles_is_not_a_jump)
+{
+  constexpr double noise_margin_m = 0.5;
+  const EgoMotionSample moving{{0.0, 0.0}, 10.0, 0.0};
+  const EgoMotionSample braked{{4.0, 0.0}, 0.0, 0.5};
+
+  EXPECT_FALSE(is_reposition_jump(moving, braked, noise_margin_m));
+  // A step no speed in either sample explains is still a jump.
+  const EgoMotionSample teleported{{40.0, 0.0}, 0.0, 0.5};
+  EXPECT_TRUE(is_reposition_jump(moving, teleported, noise_margin_m));
+}
+
+TEST(RepositionJumpTest, a_backward_nudge_at_a_standstill_is_a_jump)
+{
+  constexpr double noise_margin_m = 0.5;
+  const EgoMotionSample stopped{{5.0, 0.0}, 0.0, 0.0};
+  const EgoMotionSample nudged_back{{3.0, 0.0}, 0.0, 0.1};
+
+  EXPECT_TRUE(is_reposition_jump(stopped, nudged_back, noise_margin_m));
+}
+
+TEST(RepositionJumpTest, a_non_advancing_stamp_is_never_a_jump)
+{
+  const EgoMotionSample first{{0.0, 0.0}, 0.0, 1.0};
+  const EgoMotionSample same_stamp{{50.0, 0.0}, 0.0, 1.0};
+
+  EXPECT_FALSE(is_reposition_jump(first, same_stamp, 0.5));
 }
 
 }  // namespace lane_event_classifier

@@ -140,28 +140,16 @@ tl::expected<void, std::string> LaneEventClassifierNode::check_tracking_state()
 {
   const auto & odometry = *input_.odometry_ptr;
   const auto & ego_position = odometry.pose.pose.position;
+  const auto & velocity = odometry.twist.twist.linear;
   const lanelet::BasicPoint2d ego_point{ego_position.x, ego_position.y};
-  const rclcpp::Time ego_stamp{odometry.header.stamp};
+  const EgoMotionSample ego_motion{
+    ego_point, std::hypot(velocity.x, velocity.y), rclcpp::Time{odometry.header.stamp}.seconds()};
 
-  // Trigger 1 — a reposition jump (localization discontinuity). A fixed distance threshold cannot
-  // tell a jump from normal driving: a small backward nudge at a standstill is a reposition, while
-  // a large forward step at speed is not. So compare the measured step against the motion the
-  // reported speed can explain over the elapsed cycle (speed * dt); anything beyond that plus a
-  // localization-noise margin is treated as a reposition jump, independent of the vehicle's speed.
-  bool ego_jumped = false;
-  if (previous_ego_position_ && previous_ego_stamp_) {
-    const double elapsed_s = (ego_stamp - *previous_ego_stamp_).seconds();
-    if (elapsed_s > 0.0) {
-      const double measured_step_m = (ego_point - *previous_ego_position_).norm();
-      const auto & velocity = odometry.twist.twist.linear;
-      const double ego_speed_mps = std::hypot(velocity.x, velocity.y);
-      const double explainable_step_m =
-        ego_speed_mps * elapsed_s + params_.reposition_jump_margin_m;
-      ego_jumped = measured_step_m > explainable_step_m;
-    }
-  }
-  previous_ego_position_ = ego_point;
-  previous_ego_stamp_ = ego_stamp;
+  // Trigger 1 — a reposition jump (localization discontinuity).
+  const bool ego_jumped =
+    previous_ego_motion_ &&
+    is_reposition_jump(*previous_ego_motion_, ego_motion, params_.reposition_jump_margin_m);
+  previous_ego_motion_ = ego_motion;
   if (ego_jumped) {
     return tl::make_unexpected("reposition jump (step exceeds reported motion)");
   }
@@ -214,8 +202,8 @@ void LaneEventClassifierNode::on_trajectory(
   }
 
   stop_watch.tic("lane_tracker");
-  if (const auto res = lane_tracker_.update(input_); !res) {
-    debug_.log_reset(res.error());
+  if (const auto tracker_updated = lane_tracker_.update(input_); !tracker_updated) {
+    debug_.log_warn(tracker_updated.error());
   }
   const double lane_tracker_time_ms = stop_watch.toc("lane_tracker");
 

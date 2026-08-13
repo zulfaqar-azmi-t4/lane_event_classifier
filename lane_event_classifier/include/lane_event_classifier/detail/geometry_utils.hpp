@@ -100,6 +100,38 @@ inline bool is_turn_direction_lane(const lanelet::ConstLanelet & lane)
   return turn_direction == "left" || turn_direction == "right";
 }
 
+/** @brief Ego pose, speed and stamp of one cycle, as used to detect a localization discontinuity.
+ */
+struct EgoMotionSample
+{
+  lanelet::BasicPoint2d position;
+  double speed_mps{0.0};
+  double stamp_s{0.0};
+};
+
+/**
+ * @brief Returns true when the step between two ego samples exceeds the motion their speed
+ * explains.
+ * @param previous Ego sample of the preceding cycle.
+ * @param current Ego sample of this cycle.
+ * @param noise_margin_m Localization-noise margin allowed on top of the explainable motion.
+ *
+ * See README.md, "Parameters" (`reposition_jump_margin_m`): a fixed distance threshold cannot tell
+ * a reposition from normal driving, so the step is compared against speed * dt plus the margin.
+ */
+inline bool is_reposition_jump(
+  const EgoMotionSample & previous, const EgoMotionSample & current, double noise_margin_m)
+{
+  const double elapsed_s = current.stamp_s - previous.stamp_s;
+  if (elapsed_s <= 0.0) {
+    return false;
+  }
+  const double measured_step_m = (current.position - previous.position).norm();
+  // Braking reports a speed the step just taken predates, so the faster sample explains it.
+  const double explaining_speed_mps = std::max(previous.speed_mps, current.speed_mps);
+  return measured_step_m > explaining_speed_mps * elapsed_s + noise_margin_m;
+}
+
 /**
  * @brief Ordered trajectory points from the one nearest the ego, forward, until the accumulated arc
  * length reaches look_ahead_m.

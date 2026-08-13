@@ -18,6 +18,7 @@
 #include <autoware/vehicle_info_utils/vehicle_info_utils.hpp>
 #include <autoware_utils/ros/polling_subscriber.hpp>
 #include <lane_event_classifier/debug.hpp>
+#include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_change/classifier.hpp>
 #include <lane_event_classifier/lane_crossing/classifier.hpp>
@@ -118,10 +119,9 @@ private:
   // Classifiers — instantiated in build_classifiers()
   std::vector<std::unique_ptr<LaneEventClassifierBase>> classifiers_;
 
-  // Previous ego pose and its stamp — a step between cycles that exceeds the motion the reported
-  // speed can explain (speed * dt) is treated as a reposition jump and resets the tracking state.
-  std::optional<lanelet::BasicPoint2d> previous_ego_position_;
-  std::optional<rclcpp::Time> previous_ego_stamp_;
+  // Previous ego pose, speed and stamp — a step exceeding the motion those speeds explain is a
+  // reposition jump and resets the tracking state.
+  std::optional<EgoMotionSample> previous_ego_motion_;
 };
 
 }  // namespace lane_event_classifier

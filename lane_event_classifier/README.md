@@ -148,10 +148,10 @@ cycle. Adding a classifier is: implement the interface, then register it in `bui
 Schema: [`schema/lane_event_classifier.schema.yaml`](schema/lane_event_classifier.schema.yaml).
 Defaults: [`param/lane_event_classifier.param.yaml`](param/lane_event_classifier.param.yaml).
 
-| Name                              | Meaning                                                                                                                                                                     |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reposition_jump_margin_m`        | Localization-noise margin added to the speed-explained step (`speed · dt`); a per-cycle ego step beyond that is treated as a reposition jump and resets the tracking state. |
-| `lane_departure_reset_distance_m` | While the reference lane is held, distance from the ego to that lane above which the tracking state is reset (countermeasure for a manual takeover).                        |
+| Name                              | Meaning                                                                                                                                                                                                                                                                             |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reposition_jump_margin_m`        | Localization-noise margin added to the speed-explained step (`speed · dt`, taking the faster of this cycle's and the previous cycle's speed so braking does not shrink the budget); a per-cycle ego step beyond that is treated as a reposition jump and resets the tracking state. |
+| `lane_departure_reset_distance_m` | While the reference lane is held, distance from the ego to that lane above which the tracking state is reset (countermeasure for a manual takeover).                                                                                                                                |
 
 Lane-following check parameters (`lane_following.*`) are documented in [`docs/lane_following.md`](docs/lane_following.md#parameters).
 

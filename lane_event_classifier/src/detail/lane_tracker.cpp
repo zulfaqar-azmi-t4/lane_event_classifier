@@ -286,8 +286,10 @@ tl::expected<void, std::string> LaneTracker::update(const LaneEventInput & input
 
   debug_is_last_reanchor_blocked_ = false;
 
+  // A held reference lane is the normal state during an event, not a failure; see README.md,
+  // "Holding the reference lane".
   if (is_reference_lane_held_) {
-    return tl::make_unexpected<std::string>("Reference lane is held.");
+    return {};
   }
 
   if (const auto updated_lane_id_opt = new_reference_lane_id(input)) {
