@@ -152,7 +152,7 @@ public:
 
   uint8_t step(const LaneEventInput & input)
   {
-    tracker_.update(input);
+    [[maybe_unused]] const auto update_result = tracker_.update(input);
     classifier_.update(input);
     const uint8_t state = classifier_.get_state();
     const bool is_active = state == DS::LANE_CHANGING || state == DS::ABORTING_LANE_CHANGE;
