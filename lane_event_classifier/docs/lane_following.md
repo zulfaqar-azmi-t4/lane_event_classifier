@@ -93,8 +93,13 @@ sequence, the check reports following. Controlled by `enable_turn_lane_exemption
 ### Virtual-boundary exemption
 
 Where a lane's edge is a [virtual boundary](#key-words) rather than a painted line, crossing it is not a real lane
-departure. The check finds the nearest sequence boundary to the ego point; if that boundary is a
-virtual linestring, it reports following. Controlled by `enable_virtual_boundary_exemption`.
+departure. The check takes the sequence lane nearest the ego point, among those the ego is abreast
+of, and picks the bound on the side the ego left: left of that lane's centerline means it left over
+the left bound. If that bound is a virtual linestring, it reports following.
+
+Lanes the ego has driven past or not yet reached are skipped: their bounds were never crossed
+laterally, so a virtual bound there must not exempt a departure off the end of the sequence.
+Controlled by `enable_virtual_boundary_exemption`.
 
 ### Otherwise, Departed
 

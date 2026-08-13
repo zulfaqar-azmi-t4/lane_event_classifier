@@ -253,6 +253,27 @@ TEST(LaneFollowingTest, crossing_virtual_boundary_is_not_departure)
   EXPECT_TRUE(departed(checker_no_virtual, tracker, {5.0, 3.0}));  // exemption off → departs
 }
 
+// The virtual-boundary exemption only applies abreast of the lane. Past its end the ego never
+// crossed that bound laterally, so the nearest-bound distance there must not exempt it.
+TEST(LaneFollowingTest, beyond_the_lane_end_the_virtual_boundary_does_not_exempt)
+{
+  lanelet::Id id{};
+  auto map = test_maps::make_virtual_left_bound_map(id);  // x=[0,10], virtual LEFT bound at y=2
+
+  LaneTracker tracker;
+  ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
+
+  [[maybe_unused]] const auto update_result =
+    tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
+  tracker.hold_reference_lane();
+
+  LaneFollowingChecker checker;  // default: virtual-boundary exemption on
+  // 5 m past the x=10 end and 5 m to the left: off the end of the lane, not across its left bound.
+  EXPECT_TRUE(departed(checker, tracker, {15.0, 5.0}));
+  // Same longitudinal position, on the solid side: departs as well.
+  EXPECT_TRUE(departed(checker, tracker, {15.0, -5.0}));
+}
+
 // ── Real map tests (test/map/lanelet2_map.osm) ───────────────────────────────
 
 namespace

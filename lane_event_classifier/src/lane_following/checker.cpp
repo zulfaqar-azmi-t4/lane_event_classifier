@@ -24,8 +24,8 @@
 #include <lanelet2_core/primitives/BoundingBox.h>
 
 #include <algorithm>
-#include <cmath>
 #include <limits>
+#include <optional>
 #include <string_view>
 #include <unordered_set>
 
@@ -92,36 +92,53 @@ bool is_in_turn_lane(
   return false;
 }
 
-// virtual_boundary_exempt: the crossed boundary is virtual, approximated by the nearest one.
-bool nearest_sequence_boundary_is_virtual(
+// The sequence lane the ego is closest to, ignoring lanes it has driven past or not yet reached.
+std::optional<lanelet::ConstLanelet> nearest_sequence_lane_beside(
   const lanelet::LaneletMapPtr & map, const std::unordered_set<lanelet::Id> & ids,
-  const ReferenceLane & reference, const lanelet::BasicPoint2d & point)
+  const lanelet::BasicPoint2d & point)
 {
+  std::optional<lanelet::ConstLanelet> nearest;
   double nearest_distance = std::numeric_limits<double>::max();
-  bool nearest_is_virtual = false;
   for (const auto id : ids) {
     if (!map->laneletLayer.exists(id)) {
       continue;
     }
     const auto lane = map->laneletLayer.get(id);
-    // The sequence contains the reference lane, whose bounds the tracker already resolved.
-    const bool is_reference_lane = id == reference.reference_lane_id;
-    const double left_distance =
-      std::abs(lanelet::geometry::toArcCoordinates(lane.leftBound2d(), point).distance);
-    const double right_distance =
-      std::abs(lanelet::geometry::toArcCoordinates(lane.rightBound2d(), point).distance);
-    if (left_distance < nearest_distance) {
-      nearest_distance = left_distance;
-      nearest_is_virtual = is_reference_lane ? reference.is_reference_lane_left_bound_virtual
-                                             : is_virtual_linestring(lane.leftBound());
+    const auto centerline = lane.centerline2d();
+    const double arc_length = lanelet::geometry::toArcCoordinates(centerline, point).length;
+    // Projecting off either end means the ego is not abreast of this lane, so its bounds say
+    // nothing about the boundary the ego crossed.
+    if (arc_length <= 0.0 || arc_length >= lanelet::geometry::length(centerline)) {
+      continue;
     }
-    if (right_distance < nearest_distance) {
-      nearest_distance = right_distance;
-      nearest_is_virtual = is_reference_lane ? reference.is_reference_lane_right_bound_virtual
-                                             : is_virtual_linestring(lane.rightBound());
+    const double distance = lanelet::geometry::distance2d(lane, point);
+    if (distance < nearest_distance) {
+      nearest_distance = distance;
+      nearest = lane;
     }
   }
-  return nearest_is_virtual;
+  return nearest;
+}
+
+// virtual_boundary_exempt: the boundary the ego crossed is virtual.
+bool crossed_sequence_boundary_is_virtual(
+  const lanelet::LaneletMapPtr & map, const std::unordered_set<lanelet::Id> & ids,
+  const ReferenceLane & reference, const lanelet::BasicPoint2d & point)
+{
+  const auto nearest_lane = nearest_sequence_lane_beside(map, ids, point);
+  if (!nearest_lane) {
+    return false;
+  }
+  // Left of the centerline means the ego left over the left bound.
+  const bool has_departed_to_left =
+    lanelet::geometry::signedDistance(nearest_lane->centerline2d(), point) > 0.0;
+  // The sequence contains the reference lane, whose bounds the tracker already resolved.
+  if (nearest_lane->id() == reference.reference_lane_id) {
+    return has_departed_to_left ? reference.is_reference_lane_left_bound_virtual
+                                : reference.is_reference_lane_right_bound_virtual;
+  }
+  return is_virtual_linestring(
+    has_departed_to_left ? nearest_lane->leftBound() : nearest_lane->rightBound());
 }
 
 }  // namespace
@@ -192,7 +209,7 @@ LaneFollowingResult LaneFollowingChecker::evaluate(
   // virtual_boundary_exempt (docs/lane_following.md, "Virtual-boundary exemption").
   if (
     config_.enable_virtual_boundary_exemption &&
-    nearest_sequence_boundary_is_virtual(lanelet_map_ptr, sequence_ids, reference, ego_point)) {
+    crossed_sequence_boundary_is_virtual(lanelet_map_ptr, sequence_ids, reference, ego_point)) {
     return {true, LaneFollowingReason::virtual_boundary_exempt};
   }
 
