@@ -174,6 +174,28 @@ std::vector<lanelet::BasicPoint2d> build_out_and_back_trajectory(
   return trajectory;
 }
 
+// Builds the tail of a poke: the path starts on poke_id and returns onto base_id, so it crosses the
+// shared boundary once, inbound. The departure it belongs to exited behind the first sample.
+std::vector<lanelet::BasicPoint2d> build_back_only_trajectory(
+  const lanelet::LaneletMapPtr & map, lanelet::Id base_id, lanelet::Id poke_id, double start_frac,
+  double end_frac, std::size_t point_count)
+{
+  const auto base = centerline_points(map, base_id);
+  const auto poke = centerline_points(map, poke_id);
+  std::vector<lanelet::BasicPoint2d> trajectory;
+  trajectory.reserve(point_count);
+  for (std::size_t index = 0; index < point_count; ++index) {
+    const double progress = static_cast<double>(index) / static_cast<double>(point_count - 1);
+    const double longitudinal_fraction = start_frac + (end_frac - start_frac) * progress;
+    const lanelet::BasicPoint2d anchor = point_at_fraction(base, longitudinal_fraction);
+    const double lateral_fraction = 1.0 - progress;  // starts on poke_id, ends on base_id
+    const lanelet::BasicPoint2d base_point = nearest_point_on(base, anchor);
+    const lanelet::BasicPoint2d poke_point = nearest_point_on(poke, anchor);
+    trajectory.push_back(base_point + (poke_point - base_point) * lateral_fraction);
+  }
+  return trajectory;
+}
+
 // A small footprint square around a point (well within a road lane's width).
 std::vector<lanelet::BasicPoint2d> footprint_box(const lanelet::BasicPoint2d & center)
 {
@@ -236,6 +258,8 @@ public:
     }
     return state;
   }
+
+  [[nodiscard]] std::string debug_reason() const { return classifier_.debug_reason(); }
 
   [[nodiscard]] lanelet::Id reference_lane_id() const
   {
@@ -331,6 +355,30 @@ TEST(LaneCrossingTest, onset_then_return_completes)
     }
   }
   EXPECT_TRUE(completed) << "footprint back inside 47 for the settle window should complete";
+}
+
+// Trajectory already outside the sequence at its first sample: the lateral gate only opens once the
+// body is at the line, by which point the planner's nearest sample can sit in 48. The inbound
+// crossing closes a departure that exited behind the ego, so the ego position stands in for the
+// exit and the object ahead is still bracketed -> INTENTIONAL_LANE_CROSSING.
+TEST(LaneCrossingTest, trajectory_starting_outside_the_sequence_still_onsets)
+{
+  auto map = load_test_map();
+  ASSERT_TRUE(static_cast<bool>(map)) << "failed to load " << TEST_MAP_PATH;
+
+  Simulator sim{map, make_config()};
+  const std::vector<lanelet::Id> route{route_ids().begin(), route_ids().end()};
+
+  const auto return_only_trajectory = build_back_only_trajectory(map, 47, 48, 0.4, 0.9, 25);
+  const auto ego_in_47 = point_near_right_boundary(map, 47, 0.4, 0.4);
+  const auto object_point = point_near_right_boundary(map, 47, 0.5, 0.5);  // the object dodged
+  const auto objects =
+    test_maps::make_objects({test_maps::make_object(object_point.x(), object_point.y())});
+
+  int64_t time_ms = 0;
+  EXPECT_TRUE(
+    run_until_crossing(sim, route, return_only_trajectory, ego_in_47, objects, 10, time_ms))
+    << sim.debug_reason();
 }
 
 // No object: the identical out-and-back poke with no obstacle is never a crossing (a plain drift or

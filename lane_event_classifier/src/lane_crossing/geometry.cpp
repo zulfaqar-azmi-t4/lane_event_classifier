@@ -114,6 +114,16 @@ LaneSequenceBounds build_lane_sequence_bounds(const lanelet::ConstLanelets & lan
   return bounds;
 }
 
+// Whether the point lies inside any lane of the sequence.
+bool is_point_inside_lane_sequence(
+  const lanelet::ConstLanelets & lane_sequence, const lanelet::BasicPoint2d & point)
+{
+  return std::any_of(
+    lane_sequence.cbegin(), lane_sequence.cend(), [&point](const lanelet::ConstLanelet & lane) {
+      return lanelet::geometry::inside(lane, point);
+    });
+}
+
 // Which lane-sequence boundary a point sits nearer to (the boundary the ego crosses there).
 bool point_is_nearer_left_boundary(
   const lanelet::BasicPoint2d & point, const LaneSequenceBounds & bounds)
@@ -180,8 +190,8 @@ struct BoundaryCrossing
   lanelet::BasicPoint2d point{0.0, 0.0};
 };
 
-// Every trajectory-vs-boundary crossing, ordered by arc length along the trajectory. The trajectory
-// starts inside the sequence, so the crossings alternate exit, re-enter, exit, ...
+// Every trajectory-vs-boundary crossing, ordered by arc length along the trajectory.
+// The crossings alternate; which one comes first depends on where the trajectory starts.
 std::vector<BoundaryCrossing> get_ordered_boundary_crossings(
   const std::vector<lanelet::BasicPoint2d> & trajectory_points, const LaneSequenceBounds & bounds)
 {
@@ -218,10 +228,18 @@ struct DepartureInterval
 };
 
 std::vector<DepartureInterval> get_departure_intervals(
-  const std::vector<BoundaryCrossing> & crossings)
+  const std::vector<BoundaryCrossing> & crossings, const lanelet::BasicPoint2d & trajectory_start,
+  bool trajectory_starts_inside_sequence)
 {
   std::vector<DepartureInterval> intervals;
-  for (std::size_t index = 0; index + 1 < crossings.size(); index += 2) {
+  std::size_t first_exit_index = 0;
+  if (!trajectory_starts_inside_sequence && !crossings.empty()) {
+    // Already outside: crossings[0] closes a departure that exited behind the trajectory start.
+    const auto & reenter = crossings.front();
+    intervals.push_back({0.0, reenter.arc_m, reenter.is_to_left, trajectory_start});
+    first_exit_index = 1;
+  }
+  for (std::size_t index = first_exit_index; index + 1 < crossings.size(); index += 2) {
     const auto & exit = crossings[index];
     const auto & reenter = crossings[index + 1];
     intervals.push_back({exit.arc_m, reenter.arc_m, exit.is_to_left, exit.point});
@@ -239,10 +257,15 @@ std::optional<CrossingCandidate> get_trajectory_crossing(
   const std::vector<lanelet::BasicPoint2d> & trajectory_points, const LaneSequenceBounds & bounds,
   const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses,
   double distance_to_left_boundary_m, double distance_to_right_boundary_m,
-  double lateral_trigger_distance_m, std::size_t & debug_departure_count)
+  double lateral_trigger_distance_m, bool trajectory_starts_inside_sequence,
+  std::size_t & debug_departure_count)
 {
+  if (trajectory_points.size() < 2) {
+    return std::nullopt;
+  }
   const auto crossings = get_ordered_boundary_crossings(trajectory_points, bounds);
-  const auto departures = get_departure_intervals(crossings);
+  const auto departures = get_departure_intervals(
+    crossings, trajectory_points.front(), trajectory_starts_inside_sequence);
   debug_departure_count = departures.size();
 
   std::vector<double> candidate_arcs;
@@ -517,13 +540,18 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
   const double distance_to_right_boundary_m =
     footprint_distance_to_boundary(footprint, lane_sequence_bounds.right);
 
+  // The lateral gate lets the ego already straddle the boundary, so the start side must be tested.
+  const bool trajectory_starts_inside_sequence =
+    has_trajectory && is_point_inside_lane_sequence(lane_sequence, trajectory_points.front());
+
   // Source (a) - predictive trajectory bracket (early, centerline based, ego-near-boundary gated).
   std::size_t debug_departure_count = 0;
   const auto trajectory_crossing =
     has_trajectory ? get_trajectory_crossing(
                        trajectory_points, lane_sequence_bounds, candidate_object_poses,
                        distance_to_left_boundary_m, distance_to_right_boundary_m,
-                       predictive_lateral_trigger_distance_m_, debug_departure_count)
+                       predictive_lateral_trigger_distance_m_, trajectory_starts_inside_sequence,
+                       debug_departure_count)
                    : std::nullopt;
 
   // Source (b) - physical footprint crossing (robust, the real body over the line).
