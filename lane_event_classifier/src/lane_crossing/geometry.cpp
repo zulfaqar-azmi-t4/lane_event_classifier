@@ -27,7 +27,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <functional>
 #include <limits>
 #include <optional>
 #include <string>
@@ -573,19 +572,15 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
     distance_to_right_boundary_m, predictive_lateral_trigger_distance_m_,
     footprint_crossing.debug_note);
   if (trajectory_crossing) {
-    return std::invoke([&] {
-      auto resolved = resolve_crossing(
-        tracker, reference_lane, sequence_ids, *trajectory_crossing, "trajectory", debug_detail);
-      return CrossingResult{std::move(resolved.crossing), std::move(resolved.debug_diagnostic)};
-    });
+    auto resolved = resolve_crossing(
+      tracker, reference_lane, sequence_ids, *trajectory_crossing, "trajectory", debug_detail);
+    return {std::move(resolved.crossing), std::move(resolved.debug_diagnostic)};
   }
   if (footprint_crossing.crossing) {
-    return std::invoke([&] {
-      auto resolved = resolve_crossing(
-        tracker, reference_lane, sequence_ids, *footprint_crossing.crossing, "footprint",
-        debug_detail);
-      return CrossingResult{std::move(resolved.crossing), std::move(resolved.debug_diagnostic)};
-    });
+    auto resolved = resolve_crossing(
+      tracker, reference_lane, sequence_ids, *footprint_crossing.crossing, "footprint",
+      debug_detail);
+    return {std::move(resolved.crossing), std::move(resolved.debug_diagnostic)};
   }
   return {std::nullopt, fmt::format("no crossing ({})", debug_detail)};
 }

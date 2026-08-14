@@ -86,7 +86,7 @@ private:
   LaneChangeGeometry geometry_;  // derives the per-cycle observation from the tracker
 
   Phase phase_{Phase::idle};
-  mutable std::string debug_reason_;
+  std::string debug_reason_;
 
   // Crossing persistence (onset in idle, re-commit in aborting).
   DebouncedSignal<LaneChangeCrossing> crossing_signal_;

@@ -35,9 +35,8 @@ namespace lane_event_classifier
 struct ReferenceLane
 {
   lanelet::Id reference_lane_id{lanelet::InvalId};  // lane the ego was in before departure
-  mutable bool debug_is_reference_lane_on_route{
-    false};                                     // reference lane is itself a route primitive
-  bool is_reference_lane_road_shoulder{false};  // subtype road_shoulder
+  bool debug_is_reference_lane_on_route{false};     // reference lane is itself a route primitive
+  bool is_reference_lane_road_shoulder{false};      // subtype road_shoulder
   // Carries a turn_direction attribute, i.e. lanelet2_utils::is_intersection_lanelet.
   bool is_reference_lane_intersection{false};
   bool is_reference_lane_left_bound_virtual{false};   // left bound is a virtual linestring

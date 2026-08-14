@@ -186,7 +186,7 @@ bool LaneChangeGeometry::is_footprint_off_route_primitives(
   const LaneTracker & tracker, const LaneEventInput & input,
   const std::vector<lanelet::Id> & footprint_ids)
 {
-  if (!input.route_ptr) {
+  if (!input.route_ptr || footprint_ids.empty()) {
     return false;
   }
 

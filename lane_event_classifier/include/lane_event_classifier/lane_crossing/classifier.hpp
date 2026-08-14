@@ -87,7 +87,7 @@ private:
   LaneCrossingObjects objects_;    // perceived-object half (injected)
 
   Phase phase_{Phase::idle};
-  mutable std::string debug_reason_;
+  std::string debug_reason_;
 
   // Crossing persistence (onset in idle).
   DebouncedSignal<LaneCrossingCrossing> crossing_signal_;

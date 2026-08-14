@@ -466,4 +466,43 @@ TEST(LaneChangeTest, blinker_confidence_signal_shortens_onset_window)
     << "blinker toward the target should shorten the onset window";
 }
 
+// An empty footprint (no lane touched yet, e.g. a transient cycle) must not read as "off the route
+// primitives": none_of() over an empty range is vacuously true, which would wrongly shorten the
+// onset window as if the whole footprint had genuinely left the route primitives.
+TEST(LaneChangeTest, empty_footprint_is_not_a_confidence_signal)
+{
+  auto map = load_test_map();
+  ASSERT_TRUE(static_cast<bool>(map));
+
+  const std::vector<lanelet::Id> route{route_ids().begin(), route_ids().end()};
+  const auto crossing_trajectory = build_lane_trajectory(map, {48, 47}, 0.3, 0.9, 20);
+  const auto ego_in_48 = crossing_trajectory.front();
+
+  // Baseline: footprint straddling 48/47 is genuinely not off the route primitives.
+  const auto point_in_48 = point_at_fraction(centerline_points(map, 48), 0.4);
+  const auto point_in_47 = nearest_point_on(centerline_points(map, 47), point_in_48);
+  const std::vector<lanelet::BasicPoint2d> straddling_footprint{point_in_48, point_in_47};
+
+  auto onset_cycle = [&](const std::vector<lanelet::BasicPoint2d> & footprint) {
+    Simulator sim{map, make_config()};
+    int64_t time_ms = 0;
+    for (int cycle = 0; cycle < 20; ++cycle) {
+      const auto [sec, nsec] = stamp_from_ms(time_ms);
+      const uint8_t state = sim.step(test_maps::make_trajectory_input(
+        route, ego_in_48, sec, nsec, crossing_trajectory, footprint,
+        TurnIndicatorsReport::DISABLE));
+      if (state == DS::LANE_CHANGING) {
+        return cycle;
+      }
+      time_ms += 100;
+    }
+    return 999;
+  };
+
+  const int cycles_straddling = onset_cycle(straddling_footprint);
+  const int cycles_empty_footprint = onset_cycle({});
+  EXPECT_EQ(cycles_empty_footprint, cycles_straddling)
+    << "an empty footprint must not be read as \"off the route primitives\"";
+}
+
 }  // namespace lane_event_classifier
