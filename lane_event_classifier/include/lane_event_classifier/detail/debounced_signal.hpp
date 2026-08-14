@@ -68,6 +68,24 @@ private:
   double start_s_{0.0};
 };
 
+/**
+ * @brief Confirms a plain boolean condition once it has held for a duration.
+ *
+ * The abort and return signals both debounce a bare bool rather than a value with its own equality
+ * rule, so `matches` is always "yes, still the same condition" — this hides that idiom.
+ * @param signal Signal to feed; reset once condition goes false.
+ * @param condition Whether this cycle's condition holds.
+ * @param now_s Current time in seconds.
+ * @param persist_duration_s Window the condition must hold before confirming.
+ */
+inline bool persists(
+  DebouncedSignal<bool> & signal, bool condition, double now_s, double persist_duration_s)
+{
+  const auto always_matches = [](bool, bool) { return true; };
+  const std::optional<bool> value = condition ? std::optional{true} : std::nullopt;
+  return signal.update(value, now_s, persist_duration_s, always_matches);
+}
+
 }  // namespace lane_event_classifier
 
 #endif  // LANE_EVENT_CLASSIFIER__DETAIL__DEBOUNCED_SIGNAL_HPP_

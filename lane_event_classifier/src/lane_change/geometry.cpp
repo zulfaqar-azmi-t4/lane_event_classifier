@@ -20,7 +20,6 @@
 #include <lanelet2_core/geometry/LineString.h>
 
 #include <algorithm>
-#include <functional>
 #include <optional>
 #include <unordered_set>
 #include <vector>
@@ -84,14 +83,8 @@ LaneChangeObservation LaneChangeGeometry::observe(
   // Compute the two per-cycle intermediates once and share them across the helpers below: the
   // forward trajectory samples feed both crossing and abort observations, and the footprint lanes
   // feed both the confidence booster and the settle check.
-  const auto trajectory_points = std::invoke([&]() -> std::vector<lanelet::BasicPoint2d> {
-    if (!input.trajectory_ptr) {
-      return {};
-    }
-    const auto & ego_position = input.odometry_ptr->pose.pose.position;
-    return forward_trajectory_points(
-      *input.trajectory_ptr, {ego_position.x, ego_position.y}, crossing_look_ahead_m_);
-  });
+  const auto trajectory_points =
+    forward_trajectory_points_from_input(input, crossing_look_ahead_m_);
   const auto footprint_ids = tracker.footprint_lane_ids(input.footprint);
 
   LaneChangeObservation observation;

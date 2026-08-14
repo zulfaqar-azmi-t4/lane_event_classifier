@@ -473,14 +473,8 @@ LaneCrossingObservation LaneCrossingGeometry::observe(
   // look-ahead is the trajectory's own arc length. Fall back to the configured reach only when no
   // usable trajectory is available (a footprint-only cycle), so the boundary still spans the ego's
   // surroundings for the physical source.
-  const auto trajectory_points = std::invoke([&]() -> std::vector<lanelet::BasicPoint2d> {
-    if (!input.trajectory_ptr) {
-      return {};
-    }
-    const auto & ego_position = input.odometry_ptr->pose.pose.position;
-    return forward_trajectory_points(
-      *input.trajectory_ptr, {ego_position.x, ego_position.y}, std::numeric_limits<double>::max());
-  });
+  const auto trajectory_points =
+    forward_trajectory_points_from_input(input, std::numeric_limits<double>::max());
   const double boundary_look_ahead_m =
     trajectory_points.size() >= 2 ? polyline_arc_length(trajectory_points) : crossing_look_ahead_m_;
   const auto footprint_ids = tracker.footprint_lane_ids(input.footprint);

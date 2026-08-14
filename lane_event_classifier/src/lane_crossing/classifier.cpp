@@ -12,39 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/lane_crossing/classifier.hpp>
-#include <rclcpp/time.hpp>
-
-#include <autoware_vehicle_msgs/msg/turn_indicators_report.hpp>
 
 #include <fmt/format.h>
 
-#include <optional>
 #include <utility>
 #include <vector>
 
 namespace lane_event_classifier
 {
-
-namespace
-{
-using autoware_vehicle_msgs::msg::TurnIndicatorsReport;
-
-double stamp_to_seconds(const LaneEventInput & input)
-{
-  return rclcpp::Time(input.odometry_ptr->header.stamp).seconds();
-}
-
-// Confidence signal (docs/lane_crossing.md, "Confidence signal"): the blinker is on toward the side
-// the crossing heads to (the driver signals toward the dodge on the way out).
-bool is_blinker_toward_crossing_side(const LaneCrossingCrossing & crossing, uint8_t turn_indicator)
-{
-  if (crossing.is_to_left) {
-    return turn_indicator == TurnIndicatorsReport::ENABLE_LEFT;
-  }
-  return turn_indicator == TurnIndicatorsReport::ENABLE_RIGHT;
-}
-}  // namespace
 
 IntentionalCrossingClassifier::IntentionalCrossingClassifier(
   bool enabled, LaneCrossingConfig config, const LaneTracker & tracker,
@@ -85,7 +62,9 @@ bool IntentionalCrossingClassifier::accumulate_crossing(
 bool IntentionalCrossingClassifier::has_confidence_signal(
   const LaneEventInput & input, const LaneCrossingCrossing & crossing)
 {
-  return is_blinker_toward_crossing_side(crossing, input.turn_indicator);
+  // Confidence signal (docs/lane_crossing.md, "Confidence signal"): the blinker is on toward the
+  // side the crossing heads to (the driver signals toward the dodge on the way out).
+  return is_blinker_toward_side(crossing.is_to_left, input.turn_indicator);
 }
 
 std::vector<geometry_msgs::msg::Pose>
@@ -162,11 +141,9 @@ void IntentionalCrossingClassifier::detect_completion(
   }
 
   // Return: footprint fully back inside the route straight sequence for the settle window.
-  const auto always_matches = [](bool, bool) { return true; };
-  const std::optional<bool> return_condition =
-    observation.is_footprint_inside_reference_sequence ? std::optional{true} : std::nullopt;
-  if (return_signal_.update(
-        return_condition, now_s, config_.settle_confirm_duration_s, always_matches)) {
+  if (persists(
+        return_signal_, observation.is_footprint_inside_reference_sequence, now_s,
+        config_.settle_confirm_duration_s)) {
     debug_reason_ = "completed: footprint returned fully into the route sequence";
     phase_ = Phase::idle;
     reset_timers();

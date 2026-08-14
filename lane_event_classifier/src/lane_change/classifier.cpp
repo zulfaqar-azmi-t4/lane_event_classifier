@@ -12,37 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <lane_event_classifier/detail/geometry_utils.hpp>
 #include <lane_event_classifier/lane_change/classifier.hpp>
-#include <rclcpp/time.hpp>
-
-#include <autoware_vehicle_msgs/msg/turn_indicators_report.hpp>
 
 #include <fmt/format.h>
 
-#include <optional>
-
 namespace lane_event_classifier
 {
-
-namespace
-{
-using autoware_vehicle_msgs::msg::TurnIndicatorsReport;
-
-double stamp_to_seconds(const LaneEventInput & input)
-{
-  return rclcpp::Time(input.odometry_ptr->header.stamp).seconds();
-}
-
-// Confidence signal (docs/lane_change.md, "Persistence and confidence"): the turn blinker is on
-// toward the side the crossing heads to.
-bool is_blinker_toward_target(const LaneChangeCrossing & crossing, uint8_t turn_indicator)
-{
-  if (crossing.is_to_left) {
-    return turn_indicator == TurnIndicatorsReport::ENABLE_LEFT;
-  }
-  return turn_indicator == TurnIndicatorsReport::ENABLE_RIGHT;
-}
-}  // namespace
 
 LaneChangeClassifier::LaneChangeClassifier(
   bool enabled, LaneChangeConfig config, const LaneTracker & tracker)
@@ -83,7 +59,7 @@ bool LaneChangeClassifier::has_confidence_signal(
   // Confidence signal (docs/lane_change.md, "Persistence and confidence"): the whole footprint has
   // left the route primitives, or the blinker points at the target.
   return observation.is_footprint_off_route_primitives ||
-         is_blinker_toward_target(crossing, input.turn_indicator);
+         is_blinker_toward_side(crossing.is_to_left, input.turn_indicator);
 }
 
 void LaneChangeClassifier::update(const LaneEventInput & input)
@@ -139,11 +115,9 @@ void LaneChangeClassifier::detect_completion_or_abort(
   }
   // Abort onset (docs/lane_change.md, "Finishing or aborting"): trajectory heads back into the
   // reference lane, persisted like onset.
-  const auto always_matches = [](bool, bool) { return true; };
-  const std::optional<bool> abort_condition =
-    observation.trajectory_returns_to_reference ? std::optional{true} : std::nullopt;
-  if (abort_signal_.update(
-        abort_condition, now_s, config_.crossing_persist_duration_s, always_matches)) {
+  if (persists(
+        abort_signal_, observation.trajectory_returns_to_reference, now_s,
+        config_.crossing_persist_duration_s)) {
     debug_reason_ = "abort: trajectory returned toward the reference lane";
     phase_ = Phase::aborting;
     reset_timers();

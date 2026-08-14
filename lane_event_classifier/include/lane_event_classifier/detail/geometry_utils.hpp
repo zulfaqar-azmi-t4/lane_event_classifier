@@ -19,6 +19,9 @@
 #include <autoware_utils_geometry/geometry.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
+#include <rclcpp/time.hpp>
+
+#include <autoware_vehicle_msgs/msg/turn_indicators_report.hpp>
 
 #include <lanelet2_core/Attribute.h>
 #include <lanelet2_core/geometry/Lanelet.h>
@@ -80,6 +83,24 @@ inline bool is_virtual_linestring(const lanelet::ConstLineString3d & bound)
   // std::string default: a const char* default would make Attribute::as<> compare by pointer.
   return bound.attributeOr(lanelet::AttributeName::Type, std::string{}) ==
          lanelet::AttributeValueString::Virtual;
+}
+
+/** @brief This cycle's odometry stamp, in seconds. */
+inline double stamp_to_seconds(const LaneEventInput & input)
+{
+  return rclcpp::Time(input.odometry_ptr->header.stamp).seconds();
+}
+
+/** @brief Whether the turn blinker is on toward the given crossing side.
+ *
+ * Shared by the lane-change and lane-crossing classifiers' confidence signal: the driver blinks
+ * toward the side the crossing/dodge heads to.
+ */
+inline bool is_blinker_toward_side(bool is_to_left, uint8_t turn_indicator)
+{
+  using autoware_vehicle_msgs::msg::TurnIndicatorsReport;
+  return is_to_left ? turn_indicator == TurnIndicatorsReport::ENABLE_LEFT
+                    : turn_indicator == TurnIndicatorsReport::ENABLE_RIGHT;
 }
 
 /** @brief Ego pose, speed and stamp of one cycle, as used to detect a localization discontinuity.
@@ -166,6 +187,23 @@ inline std::vector<lanelet::BasicPoint2d> forward_trajectory_points(
         trajectory_point.pose.position.x, trajectory_point.pose.position.y};
     });
   return points;
+}
+
+/**
+ * @brief forward_trajectory_points() fed from a cycle's LaneEventInput, or empty if either the
+ * trajectory or odometry is not yet available.
+ * @param input Per-cycle input.
+ * @param look_ahead_m Arc length ahead to keep.
+ */
+inline std::vector<lanelet::BasicPoint2d> forward_trajectory_points_from_input(
+  const LaneEventInput & input, double look_ahead_m)
+{
+  if (!input.trajectory_ptr || !input.odometry_ptr) {
+    return {};
+  }
+  const auto & ego_position = input.odometry_ptr->pose.pose.position;
+  return forward_trajectory_points(
+    *input.trajectory_ptr, {ego_position.x, ego_position.y}, look_ahead_m);
 }
 
 }  // namespace lane_event_classifier
