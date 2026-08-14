@@ -2,6 +2,7 @@
   ros__parameters:
     reposition_jump_margin_m: 0.5
     lane_departure_reset_distance_m: 5.0
+    stuck_reanchor_reset_duration_s: 2.0
     lane_following:
       connected_sequence_length_m: 200.0
       lateral_tolerance_m: 0.3

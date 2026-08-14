@@ -164,6 +164,23 @@ tl::expected<void, std::string> LaneEventClassifierNode::check_tracking_state()
     if (distance_to_reference && *distance_to_reference > params_.lane_departure_reset_distance_m) {
       return tl::make_unexpected("ego departed far from the held reference lane");
     }
+    stuck_reanchor_signal_.reset();
+    return {};
+  }
+
+  // Trigger 3 — while not held, the tracker still only re-anchors on forward progress: if the
+  // ego's current lane is never a forward successor of the reference lane (reanchor blocked) and
+  // the ego is also far from it, debounce before resetting so a legitimate in-progress lane
+  // change/crossing (not yet held) is not aborted mid-maneuver.
+  const auto distance_to_reference =
+    lane_tracker_.distance_to_lane(lane_tracker_.reference_lane().reference_lane_id, ego_point);
+  const bool is_stuck_and_far = is_stuck_and_far_from_reference(
+    lane_tracker_.debug_is_last_reanchor_blocked(), distance_to_reference,
+    params_.lane_departure_reset_distance_m);
+  if (persists(
+        stuck_reanchor_signal_, is_stuck_and_far, ego_motion.stamp_s,
+        params_.stuck_reanchor_reset_duration_s)) {
+    return tl::make_unexpected("reference lane stuck: unreachable forward and far from ego");
   }
 
   return {};

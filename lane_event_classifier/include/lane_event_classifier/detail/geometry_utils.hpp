@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -133,6 +134,25 @@ inline bool is_reposition_jump(
   // Braking reports a speed the step just taken predates, so the faster sample explains it.
   const double explaining_speed_mps = std::max(previous.speed_mps, current.speed_mps);
   return measured_step_m > explaining_speed_mps * elapsed_s + noise_margin_m;
+}
+
+/**
+ * @brief True when the reference lane's reanchoring is blocked (the ego's current lane is not a
+ * forward successor of it) and the ego also sits far from it.
+ *
+ * The tracker only ever re-anchors on forward progress (never a lateral or backward move), so once
+ * blocked with no held event to eventually release it, the reference lane would otherwise stay
+ * pinned forever. See README.md, "Holding the reference lane".
+ * @param is_reanchor_blocked LaneTracker::debug_is_last_reanchor_blocked() this cycle.
+ * @param distance_to_reference_m Distance from the ego to the reference lane, or nullopt if
+ * unknown.
+ * @param reset_distance_m Distance beyond which the ego counts as far from the reference lane.
+ */
+inline bool is_stuck_and_far_from_reference(
+  bool is_reanchor_blocked, std::optional<double> distance_to_reference_m, double reset_distance_m)
+{
+  return is_reanchor_blocked && distance_to_reference_m &&
+         *distance_to_reference_m > reset_distance_m;
 }
 
 /** @brief True when the reference lane is a route primitive whose straight successor is also a

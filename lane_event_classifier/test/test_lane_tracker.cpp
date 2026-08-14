@@ -315,4 +315,26 @@ TEST(RepositionJumpTest, a_non_advancing_stamp_is_never_a_jump)
   EXPECT_FALSE(is_reposition_jump(first, same_stamp, 0.5));
 }
 
+TEST(StuckReanchorTest, blocked_and_far_is_stuck)
+{
+  EXPECT_TRUE(is_stuck_and_far_from_reference(true, 10.0, 5.0));
+}
+
+TEST(StuckReanchorTest, blocked_but_within_distance_is_not_stuck)
+{
+  EXPECT_FALSE(is_stuck_and_far_from_reference(true, 3.0, 5.0));
+}
+
+TEST(StuckReanchorTest, far_but_not_blocked_is_not_stuck)
+{
+  // Forward progress into a next lane can itself be far from the old reference point momentarily;
+  // only a blocked reanchor means the tracker cannot recover on its own.
+  EXPECT_FALSE(is_stuck_and_far_from_reference(false, 10.0, 5.0));
+}
+
+TEST(StuckReanchorTest, unknown_distance_is_not_stuck)
+{
+  EXPECT_FALSE(is_stuck_and_far_from_reference(true, std::nullopt, 5.0));
+}
+
 }  // namespace lane_event_classifier
