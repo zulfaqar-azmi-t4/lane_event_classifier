@@ -429,6 +429,16 @@ ResolvedCrossing resolve_crossing(
     break;
   }
 
+  // Onset exemption (docs/lane_crossing.md, "Exemptions"): crossing into a road shoulder is a
+  // shoulder use (pull-over, stop), not an intentional lane crossing.
+  if (target_lane_id != lanelet::InvalId) {
+    const auto target_lane_opt = tracker.get_lanelet(target_lane_id);
+    if (target_lane_opt && lanelet2_utils::is_shoulder_lane(*target_lane_opt)) {
+      return {
+        std::nullopt, fmt::format("exempt: crossing target {} is a road shoulder", target_lane_id)};
+    }
+  }
+
   LaneCrossingCrossing crossing;
   crossing.target_lane_id = target_lane_id;
   crossing.crossing_point = crossing_point;
@@ -522,6 +532,12 @@ LaneCrossingGeometry::CrossingResult LaneCrossingGeometry::compute_crossing(
   // reference lane. Going out of lane there is turning, not dodging, so no crossing is possible.
   if (tracker.reference_lane().is_reference_lane_intersection) {
     return {std::nullopt, "exempt: reference lane is a turn/intersection lane"};
+  }
+
+  // Onset exemption (docs/lane_crossing.md, "Exemptions"): the reference lane is a road shoulder.
+  // Leaving it is a shoulder use (pull-over, stop), not an intentional lane crossing.
+  if (tracker.reference_lane().is_reference_lane_road_shoulder) {
+    return {std::nullopt, "exempt: reference lane is a road shoulder"};
   }
 
   // A crossing is only meaningful when the ego has an object to go around: both sources are gated

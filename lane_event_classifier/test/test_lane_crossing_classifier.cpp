@@ -116,6 +116,23 @@ lanelet::BasicPoint2d point_near_right_boundary(
   return boundary_point + inward * inset_m;
 }
 
+// Same as point_near_right_boundary but for the left boundary.
+lanelet::BasicPoint2d point_near_left_boundary(
+  const lanelet::LaneletMapPtr & map, lanelet::Id id, double frac, double inset_m)
+{
+  const auto left_bound = map->laneletLayer.get(id).leftBound2d();
+  std::vector<lanelet::BasicPoint2d> bound_points;
+  bound_points.reserve(left_bound.size());
+  for (const auto & point : left_bound) {
+    bound_points.emplace_back(point.x(), point.y());
+  }
+  const lanelet::BasicPoint2d boundary_point = point_at_fraction(bound_points, frac);
+  const lanelet::BasicPoint2d center_point =
+    nearest_point_on(centerline_points(map, id), boundary_point);
+  const lanelet::BasicPoint2d inward = (center_point - boundary_point).normalized();
+  return boundary_point + inward * inset_m;
+}
+
 // Builds a trajectory that starts on lane_ids.front() and sweeps laterally through the listed lanes
 // (in order) while advancing forward along the first lane. A single sweep {47, 48} commits to the
 // neighbour and never returns - the lane-change signature, not a crossing.
@@ -356,6 +373,36 @@ TEST(LaneCrossingTest, onset_then_return_completes)
     }
   }
   EXPECT_TRUE(completed) << "footprint back inside 47 for the settle window should complete";
+}
+
+// Onset exemption: 176949 is a road shoulder sharing 47's left boundary. A predictive dodge that
+// brackets an object and pokes toward it is never an intentional crossing — crossing to a road
+// shoulder is always lane following (docs/lane_crossing.md, "Exemptions").
+TEST(LaneCrossingTest, dodge_toward_road_shoulder_is_not_a_crossing)
+{
+  auto map = load_test_map();
+  ASSERT_TRUE(static_cast<bool>(map)) << "failed to load " << TEST_MAP_PATH;
+
+  Simulator sim{map, make_config()};
+  const std::vector<lanelet::Id> route{route_ids().begin(), route_ids().end()};
+
+  const auto crossing_trajectory = build_out_and_back_trajectory(map, 47, 176949, 0.3, 0.9, 25);
+  const auto ego_in_47 = point_near_left_boundary(map, 47, 0.3, 0.4);
+  const auto object_point = point_at_fraction(centerline_points(map, 47), 0.6);
+  const auto objects =
+    test_maps::make_objects({test_maps::make_object(object_point.x(), object_point.y())});
+
+  int64_t time_ms = 0;
+  for (int cycle = 0; cycle < 10; ++cycle) {
+    const auto [sec, nsec] = stamp_from_ms(time_ms);
+    const uint8_t state = sim.step(test_maps::make_trajectory_input(
+      route, ego_in_47, sec, nsec, crossing_trajectory, {ego_in_47}, TurnIndicatorsReport::DISABLE,
+      objects));
+    EXPECT_NE(state, DS::INTENTIONAL_LANE_CROSSING)
+      << "a dodge into a road shoulder is a shoulder use, not an intentional crossing: "
+      << sim.debug_reason();
+    time_ms += 100;
+  }
 }
 
 // Trajectory already outside the sequence at its first sample: the lateral gate only opens once the

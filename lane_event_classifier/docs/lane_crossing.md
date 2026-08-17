@@ -106,13 +106,18 @@ point.
 
 ### Exemptions
 
-A found crossing is dropped when either of these holds:
+A found crossing is dropped when any of these holds:
 
 - The reference lane is a turn or intersection lane. Leaving the lane there is turning, not dodging.
+- The reference lane is a road shoulder. Leaving it is a shoulder use (pull-over, stop), not an
+  intentional lane crossing.
+- The crossing target is a road shoulder. Crossing into it is the same shoulder use, from the other
+  direction.
 - The crossed boundary is a virtual linestring, not a real lane marking.
 
-These are the turn-lane and virtual-boundary exemptions the [lane-following check](lane_following.md)
-already applies, reused here for onset.
+The turn-lane and virtual-boundary exemptions are the same ones the
+[lane-following check](lane_following.md) already applies, reused here for onset. Crossing to or from
+a road shoulder is always lane following, never an intentional crossing.
 
 ### Persistence
 
