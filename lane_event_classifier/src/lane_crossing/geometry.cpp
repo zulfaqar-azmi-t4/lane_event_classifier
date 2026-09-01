@@ -335,8 +335,10 @@ FootprintCrossing get_footprint_crossing(
       deepest_footprint_overshoot(tracker, reference_lane_id, neighbour_id, footprint);
     const auto neighbour_lane = tracker.get_lanelet(neighbour_id);
     const bool is_shoulder = neighbour_lane && lanelet2_utils::is_shoulder_lane(*neighbour_lane);
-    debug_notes.push_back(fmt::format(
-      "{}:{:.2f}m{}", neighbour_id, overshoot.overshoot_m, is_shoulder ? " shoulder-exempt" : ""));
+    debug_notes.push_back(
+      fmt::format(
+        "{}:{:.2f}m{}", neighbour_id, overshoot.overshoot_m,
+        is_shoulder ? " shoulder-exempt" : ""));
     if (is_shoulder) {
       continue;
     }

@@ -89,10 +89,11 @@ void LaneEventClassifierDebug::log_state(
     previous_reference_lane_id_ = reference_lane.reference_lane_id;
   }
   if (!lane_tracker.is_reference_lane_held() && lane_tracker.debug_is_last_reanchor_blocked()) {
-    log_warn(fmt::format(
-      "[lane_event] reference lane STUCK at {} but ego is now in lane {} (not a next lane of the "
-      "reference lane) -> footprint will read as a lateral departure",
-      reference_lane.reference_lane_id, lane_tracker.debug_last_selected_lane_id()));
+    log_warn(
+      fmt::format(
+        "[lane_event] reference lane STUCK at {} but ego is now in lane {} (not a next lane of the "
+        "reference lane) -> footprint will read as a lateral departure",
+        reference_lane.reference_lane_id, lane_tracker.debug_last_selected_lane_id()));
   }
 
   // Built lazily — it scans the map, so only when a log line is actually emitted.

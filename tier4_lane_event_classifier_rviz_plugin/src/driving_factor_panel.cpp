@@ -99,14 +99,15 @@ void DrivingFactorPanel::processMessage(
 {
   const auto [label, bg_color] = style_for_state(msg->driving_state.state);
   state_label_->setText(label);
-  state_label_->setStyleSheet(QString("QLabel {"
-                                      "  padding: 12px;"
-                                      "  border-radius: 6px;"
-                                      "  background-color: %1;"
-                                      "  color: white;"
-                                      "  font-size: 14px;"
-                                      "  font-weight: bold;"
-                                      "}")
+  state_label_->setStyleSheet(QString(
+                                "QLabel {"
+                                "  padding: 12px;"
+                                "  border-radius: 6px;"
+                                "  background-color: %1;"
+                                "  color: white;"
+                                "  font-size: 14px;"
+                                "  font-weight: bold;"
+                                "}")
                                 .arg(bg_color));
 }
 
