@@ -80,9 +80,7 @@ LaneChangeGeometry::LaneChangeGeometry(double crossing_look_ahead_m)
 LaneChangeObservation LaneChangeGeometry::observe(
   const LaneTracker & tracker, const LaneEventInput & input) const
 {
-  // Compute the two per-cycle intermediates once and share them across the helpers below: the
-  // forward trajectory samples feed both crossing and abort observations, and the footprint lanes
-  // feed both the confidence booster and the settle check.
+  // Compute the two per-cycle intermediates once and share them across the helpers below.
   const auto trajectory_points =
     forward_trajectory_points_from_input(input, crossing_look_ahead_m_);
   const auto footprint_ids = tracker.footprint_lane_ids(input.footprint);
@@ -135,8 +133,7 @@ std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
     return std::nullopt;
   }
 
-  // Onset exemptions; see docs/lane_change.md, "Exemptions". An intersection lanelet is one
-  // carrying a turn_direction attribute, so this covers left/right turn lanes too.
+  // Onset exemptions (docs/lane_change.md, "Exemptions"); turn lanes carry turn_direction.
   if (reference.is_reference_lane_intersection) {
     return std::nullopt;
   }

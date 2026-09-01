@@ -36,8 +36,7 @@ void LaneChangeClassifier::reset_timers()
 bool LaneChangeClassifier::accumulate_crossing(
   const LaneChangeCrossing & crossing, double now_s, bool has_confidence_signal)
 {
-  // Both-persistence (docs/lane_change.md, "Persistence and confidence"): the same target lane
-  // and a crossing location stable within tolerance.
+  // Both-persistence (docs/lane_change.md, "Persistence and confidence"): stable target and point.
   const auto matches_tracked =
     [this](const LaneChangeCrossing & tracked, const LaneChangeCrossing & current) {
       return tracked.target_lane_id == current.target_lane_id &&
@@ -45,8 +44,7 @@ bool LaneChangeClassifier::accumulate_crossing(
                config_.crossing_position_tolerance_m;
     };
 
-  // Confidence signal (docs/lane_change.md, "Persistence and confidence"): shortens
-  // (never bypasses) the crossing-persistence window.
+  // Confidence signal (docs/lane_change.md, "Persistence and confidence"): shortens the window.
   const double effective_persist_duration =
     config_.crossing_persist_duration_s * (has_confidence_signal ? config_.confidence_factor : 1.0);
   return crossing_signal_.update(crossing, now_s, effective_persist_duration, matches_tracked);
@@ -56,8 +54,7 @@ bool LaneChangeClassifier::has_confidence_signal(
   const LaneEventInput & input, const LaneChangeObservation & observation,
   const LaneChangeCrossing & crossing)
 {
-  // Confidence signal (docs/lane_change.md, "Persistence and confidence"): the whole footprint has
-  // left the route primitives, or the blinker points at the target.
+  // Confidence signal (docs/lane_change.md, "Persistence and confidence"): footprint or blinker.
   return observation.is_footprint_off_route_primitives ||
          is_blinker_toward_side(crossing.is_to_left, input.turn_indicator);
 }
@@ -100,8 +97,7 @@ void LaneChangeClassifier::detect_onset(
 void LaneChangeClassifier::detect_completion_or_abort(
   const LaneChangeObservation & observation, double now_s)
 {
-  // Completion / settle (docs/lane_change.md, "Finishing or aborting"): footprint fully inside a
-  // target route primitive for the settle window.
+  // Completion (docs/lane_change.md, "Finishing or aborting"): footprint settled in the target.
   const auto same_lane = [](lanelet::Id tracked, lanelet::Id current) {
     return tracked == current;
   };
@@ -113,8 +109,7 @@ void LaneChangeClassifier::detect_completion_or_abort(
     reset_timers();
     return;
   }
-  // Abort onset (docs/lane_change.md, "Finishing or aborting"): trajectory heads back into the
-  // reference lane, persisted like onset.
+  // Abort onset (docs/lane_change.md, "Finishing or aborting"): trajectory heads back, persisted.
   if (persists(
         abort_signal_, observation.trajectory_returns_to_reference, now_s,
         config_.crossing_persist_duration_s)) {
@@ -127,8 +122,7 @@ void LaneChangeClassifier::detect_completion_or_abort(
 void LaneChangeClassifier::detect_abort_completion_or_recommit(
   const LaneEventInput & input, const LaneChangeObservation & observation, double now_s)
 {
-  // Abort completion (docs/lane_change.md, "Aborting"): footprint fully back inside the reference
-  // lane (geometric, no dwell).
+  // Abort completion (docs/lane_change.md, "Aborting"): footprint fully back in the reference.
   if (observation.is_footprint_inside_reference_lane) {
     debug_reason_ = "abort completed: footprint fully back inside the reference lane";
     phase_ = Phase::idle;
@@ -147,8 +141,7 @@ void LaneChangeClassifier::detect_abort_completion_or_recommit(
     reset_timers();
     return;
   }
-  // Re-commit (docs/lane_change.md, "Aborting"): trajectory swings back toward the target lane,
-  // persisted like onset.
+  // Re-commit (docs/lane_change.md, "Aborting"): trajectory swings back, persisted like onset.
   if (!observation.crossing) {
     crossing_signal_.reset();
     return;

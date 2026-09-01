@@ -58,10 +58,7 @@ void LaneEventClassifierNode::build_classifiers()
 {
   lane_following_checker_ = LaneFollowingChecker(params_.lane_following);
 
-  // Classifiers are constructed here (no plugin/pluginlib): the node owns a vector of concrete
-  // LaneEventClassifierBase implementations and iterates it in on_trajectory(). Each classifier
-  // derives its own per-cycle geometry from the shared LaneTracker's generic queries. Vector order
-  // is the arbitration priority: lane change first, then intentional crossing.
+  // Vector order is the arbitration priority: lane change first, then intentional crossing.
   classifiers_.clear();
   classifiers_.emplace_back(std::make_unique<LaneChangeClassifier>(
     params_.lane_change.enable_classifier, params_.lane_change, lane_tracker_));
@@ -126,8 +123,7 @@ tl::expected<void, std::string> LaneEventClassifierNode::take_data(
       std::make_unique<autoware::vehicle_info_utils::VehicleInfo>(vehicle_info_);
   }
 
-  // Turn indicator is optional: keep the previous / default value when it is unavailable rather
-  // than failing the cycle (the blinker confidence signal just stays inactive).
+  // Turn indicator is optional: keep the previous value rather than failing the cycle.
   if (const auto turn_indicators_msg = sub_turn_indicators_.take_data()) {
     input_.turn_indicator = turn_indicators_msg->report;
   }
@@ -155,9 +151,7 @@ tl::expected<void, std::string> LaneEventClassifierNode::check_tracking_state()
     return tl::make_unexpected("reposition jump (step exceeds reported motion)");
   }
 
-  // Trigger 2 — while the reference lane is held (an event is active) the tracker never
-  // re-anchors, so a manual takeover that drives far from the held lane would keep the reference
-  // lane held forever. Reset once the ego strays past the departure threshold.
+  // Trigger 2 — a held reference lane never re-anchors, so reset once the ego strays past it.
   if (lane_tracker_.is_reference_lane_held()) {
     const auto distance_to_reference =
       lane_tracker_.distance_to_lane(lane_tracker_.reference_lane().reference_lane_id, ego_point);
@@ -168,10 +162,7 @@ tl::expected<void, std::string> LaneEventClassifierNode::check_tracking_state()
     return {};
   }
 
-  // Trigger 3 — while not held, the tracker still only re-anchors on forward progress: if the
-  // ego's current lane is never a forward successor of the reference lane (reanchor blocked) and
-  // the ego is also far from it, debounce before resetting so a legitimate in-progress lane
-  // change/crossing (not yet held) is not aborted mid-maneuver.
+  // Trigger 3 — an unheld reference lane with a blocked reanchor resets after the debounce.
   const auto distance_to_reference =
     lane_tracker_.distance_to_lane(lane_tracker_.reference_lane().reference_lane_id, ego_point);
   const bool is_stuck_and_far = is_stuck_and_far_from_reference(
@@ -254,8 +245,7 @@ void LaneEventClassifierNode::on_trajectory(
     }
     is_any_event_active = true;
   }
-  // No confirmed event: fall back to the lane-following check. A departure with no classified event
-  // is UNKNOWN.
+  // No confirmed event: fall back to the lane-following check; a departure is then UNKNOWN.
   if (!is_any_event_active && !lane_following_result.is_following) {
     current_state_val = DrivingState::UNKNOWN;
   }
@@ -265,8 +255,7 @@ void LaneEventClassifierNode::on_trajectory(
   out.driving_state.state = current_state_val;
   pub_driving_factor_->publish(out);
 
-  // Freeze the reference lane while an event runs, release it when the event ends; see README.md,
-  // "Holding the reference lane".
+  // Freeze the reference lane while an event runs (README.md, "Holding the reference lane").
   const auto & ref_lane = lane_tracker_.reference_lane();
   if (is_any_event_active && !lane_tracker_.is_reference_lane_held()) {
     lane_tracker_.hold_reference_lane();

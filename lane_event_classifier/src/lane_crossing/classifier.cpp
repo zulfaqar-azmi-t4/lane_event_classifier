@@ -62,8 +62,7 @@ bool IntentionalCrossingClassifier::accumulate_crossing(
 bool IntentionalCrossingClassifier::has_confidence_signal(
   const LaneEventInput & input, const LaneCrossingCrossing & crossing)
 {
-  // Confidence signal (docs/lane_crossing.md, "Confidence signal"): the blinker is on toward the
-  // side the crossing heads to (the driver signals toward the dodge on the way out).
+  // Confidence signal (docs/lane_crossing.md, "Confidence signal"): blinker toward the dodge.
   return is_blinker_toward_side(crossing.is_to_left, input.turn_indicator);
 }
 
@@ -127,8 +126,7 @@ void IntentionalCrossingClassifier::detect_onset(
 void IntentionalCrossingClassifier::detect_completion(
   const LaneCrossingObservation & observation, double now_s)
 {
-  // Finishing (docs/lane_crossing.md, "Finishing"): end once fully inside one lane; full entry
-  // checked before return, else hold. No time cap.
+  // Finishing (docs/lane_crossing.md, "Finishing"): end once fully inside one lane. No time cap.
 
   // Full entry: the ego is fully in the neighbour, hand the move to the lane-change classifier.
   if (observation.full_entry_lane_id) {

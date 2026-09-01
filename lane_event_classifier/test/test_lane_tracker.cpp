@@ -123,8 +123,7 @@ TEST(LaneTrackerTest, reference_holds_across_lateral_move)
     tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
-  // Ego moves sideways into the parallel lane_b (not a next lane): the reference lane must not
-  // advance, and the blocked-reanchor diagnostic fires.
+  // A sideways move into parallel lane_b must not advance the reference lane.
   [[maybe_unused]] const auto update_result_2 =
     tracker.update(make_input({id_a, id_b}, 5.0, 4.0, 1, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_a);
@@ -146,8 +145,7 @@ TEST(LaneTrackerTest, hold_freezes_reference_until_released)
   tracker.hold_reference_lane();
   EXPECT_TRUE(tracker.is_reference_lane_held());
 
-  // While held the reference lane is frozen even as the ego advances into lane_b. A hold is the
-  // normal state during an event, so the update still succeeds; the node logs only real failures.
+  // While held the reference lane is frozen even as the ego advances into lane_b.
   const auto update_result_2 = tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
   EXPECT_TRUE(update_result_2.has_value());
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_a);
@@ -160,11 +158,7 @@ TEST(LaneTrackerTest, hold_freezes_reference_until_released)
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_b);
 }
 
-// Regression: after an event completes in a lane that is not a forward successor of the reference
-// (a lane change into a parallel lane), releasing the hold must re-anchor the reference to that
-// parallel lane. Without the release the reference stays pinned to the origin lane forever (the
-// tracker only advances into a forward successor), so the classifier re-detects the same crossing
-// every cycle. The node wires hold-on-active / release-on-completion to drive exactly this.
+// Regression: releasing the hold must re-anchor the reference to the parallel lane.
 TEST(LaneTrackerTest, release_reanchors_to_parallel_lane_after_hold)
 {
   lanelet::Id id_a = lanelet::InvalId;
@@ -176,16 +170,13 @@ TEST(LaneTrackerTest, release_reanchors_to_parallel_lane_after_hold)
     tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
-  // An event begins: the node freezes the reference lane, and the ego crosses fully into the
-  // parallel lane_b (not a next lane of lane_a). The reference must stay pinned to lane_a.
+  // An event begins and the ego crosses into lane_b, so the reference stays pinned to lane_a.
   tracker.hold_reference_lane();
   [[maybe_unused]] const auto update_result_2 =
     tracker.update(make_input({id_a, id_b}, 5.0, 4.0, 1, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_a);
 
-  // The event completes: releasing re-anchors the reference to the parallel lane the ego settled
-  // into (lane_b) rather than leaving it stuck on lane_a. lane_b is not a successor of lane_a, so
-  // this only works because release clears the reference first.
+  // The event completes, so releasing re-anchors the reference to lane_b.
   tracker.release_reference_lane();
   [[maybe_unused]] const auto update_result_3 =
     tracker.update(make_input({id_a, id_b}, 5.0, 4.0, 2, 0));
@@ -284,8 +275,7 @@ TEST(LaneTrackerTest, route_primitive_cache_tracks_current_route)
   EXPECT_FALSE(tracker.is_route_primitive(id_b));
 }
 
-// The step of a braking cycle was travelled at the previous speed, not the one reported now, so
-// judging it against the current speed alone reads hard braking as a localization jump.
+// A braking step travelled at the previous speed reads as a localization jump if judged now.
 TEST(RepositionJumpTest, braking_between_cycles_is_not_a_jump)
 {
   constexpr double noise_margin_m = 0.5;
@@ -327,8 +317,7 @@ TEST(StuckReanchorTest, blocked_but_within_distance_is_not_stuck)
 
 TEST(StuckReanchorTest, far_but_not_blocked_is_not_stuck)
 {
-  // Forward progress into a next lane can itself be far from the old reference point momentarily;
-  // only a blocked reanchor means the tracker cannot recover on its own.
+  // Only a blocked reanchor means the tracker cannot recover on its own.
   EXPECT_FALSE(is_stuck_and_far_from_reference(false, 10.0, 5.0));
 }
 

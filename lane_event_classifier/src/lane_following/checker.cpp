@@ -54,16 +54,14 @@ bool is_point_within_tolerance_of_any(
   });
 }
 
-// road_shoulder_exempt: shoulders are excluded from the routing graph, so this is an explicit
-// check.
+// road_shoulder_exempt: shoulders are outside the routing graph, so this check is explicit.
 bool is_point_in_road_shoulder(
   const lanelet::LaneletMapPtr & map, const lanelet::BasicPoint2d & point)
 {
   return !lanelet2_utils::get_shoulder_lanelets_at(map, point.x(), point.y()).empty();
 }
 
-// turn_lane_exempt: ego is in a turn / intersection lane, either the reference lane or a sequence
-// one.
+// turn_lane_exempt: the ego is in a turn lane, either the reference lane or a sequence one.
 bool is_in_turn_lane(
   const lanelet::LaneletMapPtr & map, const ReferenceLane & reference,
   const std::unordered_set<lanelet::Id> & sequence_ids, const lanelet::BasicPoint2d & point)
@@ -98,8 +96,7 @@ std::optional<lanelet::ConstLanelet> nearest_sequence_lane_beside(
     const auto lane = map->laneletLayer.get(id);
     const auto centerline = lane.centerline2d();
     const double arc_length = lanelet::geometry::toArcCoordinates(centerline, point).length;
-    // Projecting off either end means the ego is not abreast of this lane, so its bounds say
-    // nothing about the boundary the ego crossed.
+    // Projecting off either end means the ego is not abreast, so this lane's bounds say nothing.
     if (arc_length <= 0.0 || arc_length >= lanelet::geometry::length(centerline)) {
       continue;
     }

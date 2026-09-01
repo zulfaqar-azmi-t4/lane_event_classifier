@@ -28,14 +28,7 @@ namespace lane_event_classifier
 {
 using LaneChangeConfig = ::lane_event_classifier::Params::LaneChange;
 
-/**
- * @brief Trajectory-driven, predictive lane-change classifier.
- *
- * Onset is decided by where the planned trajectory crosses the reference lane's lateral boundary
- * toward a route primitive (computed by LaneChangeGeometry from the LaneTracker's generic queries);
- * it can confirm before the ego body leaves the reference lane. Completion (settle) and abort
- * completion use the full footprint. See docs/lane_change.md.
- */
+/** @brief Trajectory-driven, predictive lane-change classifier. See docs/lane_change.md. */
 class LaneChangeClassifier : public LaneEventClassifierBase
 {
 public:
@@ -54,26 +47,19 @@ private:
   void detect_onset(
     const LaneEventInput & input, const LaneChangeObservation & observation, double now_s);
 
-  /** @brief changing: confirm the footprint settled in the target primitive → completion, or a
-   * persisted trajectory return toward the reference lane → ABORTING. */
+  /** @brief changing: complete on a settled footprint, or go to ABORTING on a return. */
   void detect_completion_or_abort(const LaneChangeObservation & observation, double now_s);
 
-  /** @brief aborting: complete the abort once the footprint is back in the reference lane, settle
-   * if the footprint reached the target primitive, or re-commit on a persisted crossing →
-   * LANE_CHANGING.
-   */
+  /** @brief aborting: complete the abort, settle at the target, or re-commit to LANE_CHANGING. */
   void detect_abort_completion_or_recommit(
     const LaneEventInput & input, const LaneChangeObservation & observation, double now_s);
 
-  /** @brief True when a confidence signal (footprint off route, or blinker toward target) is
-   * present.
-   */
+  /** @brief True when a confidence signal (footprint off route, or blinker) is present. */
   [[nodiscard]] static bool has_confidence_signal(
     const LaneEventInput & input, const LaneChangeObservation & observation,
     const LaneChangeCrossing & crossing);
 
-  /** @brief Accumulates a valid crossing over the crossing-persistence window (shortened by a
-   * confidence signal); true on confirm. */
+  /** @brief Accumulates a valid crossing over the persistence window; true on confirm. */
   [[nodiscard]] bool accumulate_crossing(
     const LaneChangeCrossing & crossing, double now_s, bool has_confidence_signal);
 

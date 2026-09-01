@@ -78,8 +78,7 @@ void LaneEventClassifierDebug::log_state(
   const bool ego_departed = !is_lane_following;
   const auto following_reason = to_debug_string(lane_following_reason);
 
-  // Trace reference lane (re)anchoring and the "stuck reference lane" condition (reference lane can
-  // no longer follow ego).
+  // Trace reference lane (re)anchoring and the "stuck reference lane" condition.
   if (reference_lane.reference_lane_id != previous_reference_lane_id_) {
     RCLCPP_INFO(
       logger_, "%s",
@@ -140,9 +139,7 @@ void LaneEventClassifierDebug::log_state(
         .c_str());
   }
 
-  // Per-cycle classifier reasoning (throttled): surfaces why an event did or did not fire even
-  // while the published state is steady (e.g. a crossing that never onsets because no object
-  // qualifies).
+  // Per-cycle classifier reasoning (throttled): why an event did or did not fire.
   std::string classifier_reasons;
   for (const auto & classifier : classifiers) {
     const auto reason = classifier->debug_reason();
@@ -168,10 +165,7 @@ void LaneEventClassifierDebug::publish_processing_time(
   processing_time_msg.data = total_time_ms;
   pub_processing_time_->publish(processing_time_msg);
 
-  // Processing-time text overlay: current value with a running max per section, e.g.
-  //   total: 0.33 (max: 1.00) [ms]
-  //   lane_following: 0.08 (max: 0.30) [ms]
-  //   lane_change: 0.05 (max: 0.20) [ms]
+  // Processing-time text overlay, e.g. "total: 0.33 (max: 1.00) [ms]" per section.
   const auto format_processing_time = [this](const std::string & label, double time_ms) {
     double & max_time_ms = max_processing_time_ms_[label];
     max_time_ms = std::max(max_time_ms, time_ms);

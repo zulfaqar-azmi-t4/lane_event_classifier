@@ -21,14 +21,7 @@
 namespace lane_event_classifier
 {
 
-/**
- * @brief Confirms a per-cycle sample only once it has persisted, unchanged, for a duration.
- *
- * Every classifier debounce (onset crossing, settle, return, abort) is the same shape: track a
- * value across cycles, restart the window whenever it goes away or changes, and confirm once the
- * window elapses. Feed one sample per cycle through update(); the persist duration may vary
- * per-call (e.g. shortened by a confidence signal).
- */
+/** @brief Confirms a per-cycle sample only once it has persisted, unchanged, for a duration. */
 template <typename T>
 class DebouncedSignal
 {

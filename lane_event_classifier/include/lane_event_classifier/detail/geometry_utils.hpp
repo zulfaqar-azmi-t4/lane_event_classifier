@@ -92,11 +92,7 @@ inline double stamp_to_seconds(const LaneEventInput & input)
   return rclcpp::Time(input.odometry_ptr->header.stamp).seconds();
 }
 
-/** @brief Whether the turn blinker is on toward the given crossing side.
- *
- * Shared by the lane-change and lane-crossing classifiers' confidence signal: the driver blinks
- * toward the side the crossing/dodge heads to.
- */
+/** @brief Whether the turn blinker is on toward the given crossing side. */
 inline bool is_blinker_toward_side(bool is_to_left, uint8_t turn_indicator)
 {
   using autoware_vehicle_msgs::msg::TurnIndicatorsReport;
@@ -104,8 +100,7 @@ inline bool is_blinker_toward_side(bool is_to_left, uint8_t turn_indicator)
                     : turn_indicator == TurnIndicatorsReport::ENABLE_RIGHT;
 }
 
-/** @brief Ego pose, speed and stamp of one cycle, as used to detect a localization discontinuity.
- */
+/** @brief Ego pose, speed and stamp of one cycle, used to detect a localization jump. */
 struct EgoMotionSample
 {
   lanelet::BasicPoint2d position;

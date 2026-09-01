@@ -32,12 +32,7 @@ namespace lane_event_classifier
 {
 using LaneCrossingConfig = ::lane_event_classifier::Params::LaneCrossing;
 
-/**
- * @brief Predictive intentional-lane-crossing classifier: a partial sideways dodge over a lane
- * boundary to pass an object ahead, then a return; a move that fully enters the neighbour is a lane
- * change. Onset is trajectory (predictive) plus footprint (physical). Abort is not modelled in this
- * pass. See docs/lane_crossing.md.
- */
+/** @brief Predictive intentional-lane-crossing classifier. See docs/lane_crossing.md. */
 class IntentionalCrossingClassifier : public LaneEventClassifierBase
 {
 public:
@@ -54,26 +49,22 @@ private:
   /** @brief Internal maneuver phase; maps to the reported DrivingState. */
   enum class Phase : uint8_t { idle, crossing };
 
-  /** @brief idle phase: fire onset (→ INTENTIONAL_LANE_CROSSING) when a crossing persists. See
-   * docs/lane_crossing.md, "Onset". */
+  /** @brief idle phase: fire onset when a crossing persists (docs/lane_crossing.md, "Onset"). */
   void detect_onset(
     const LaneEventInput & input, const LaneCrossingObservation & observation, double now_s);
 
-  /** @brief The candidate object poses for this cycle: perceived now, else the remembered set. See
-   * docs/lane_crossing.md, "Candidate object". */
+  /** @brief The candidate object poses for this cycle: perceived now, else the remembered set. */
   [[nodiscard]] std::vector<geometry_msgs::msg::Pose> effective_candidate_object_poses(
     std::vector<geometry_msgs::msg::Pose> perceived_poses, double now_s);
 
-  /** @brief crossing phase: end once the ego is fully inside one lane (return or full entry). See
-   * docs/lane_crossing.md, "Finishing". */
+  /** @brief crossing phase: end once the ego is fully inside one lane (return or full entry). */
   void detect_completion(const LaneCrossingObservation & observation, double now_s);
 
   /** @brief True when a confidence signal (blinker toward the crossing side) is present. */
   [[nodiscard]] static bool has_confidence_signal(
     const LaneEventInput & input, const LaneCrossingCrossing & crossing);
 
-  /** @brief Accumulates a valid crossing over the crossing-persistence window (shortened by a
-   * confidence signal); true on confirm. */
+  /** @brief Accumulates a valid crossing over the persistence window; true on confirm. */
   [[nodiscard]] bool accumulate_crossing(
     const LaneCrossingCrossing & crossing, double now_s, bool has_confidence_signal);
 

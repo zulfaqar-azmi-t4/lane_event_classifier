@@ -110,9 +110,7 @@ LaneCrossingObjects::LaneSequenceScan LaneCrossingObjects::scan_lane_sequence_ob
   LaneSequenceScan scan;
   double debug_nearest_ahead_m = std::numeric_limits<double>::max();
   for (const auto & object : objects) {
-    // Candidate object (docs/lane_crossing.md, "Onset"): touches the reference straight sequence
-    // and lies ahead within the longitudinal window. Speed is not a qualifier - the trajectory
-    // bracket decides whether the ego actually goes around it.
+    // Candidate object (docs/lane_crossing.md, "Onset"): on the sequence, ahead within the window.
     if (!object_touches_lane_sequence(object, lane_sequence_polygons)) {
       continue;
     }

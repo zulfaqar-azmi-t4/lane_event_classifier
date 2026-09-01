@@ -23,11 +23,7 @@
 namespace lane_event_classifier
 {
 
-/** @brief Interface for lane-event classifiers.
- *
- * Each classifier holds the (generic) LaneTracker it depends on and derives its own per-cycle
- * geometry from the tracker's queries, so no shared per-cycle context is passed here.
- */
+/** @brief Interface for lane-event classifiers. */
 class LaneEventClassifierBase
 {
 public:

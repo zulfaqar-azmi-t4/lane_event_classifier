@@ -154,10 +154,7 @@ lanelet::ConstLanelets LaneTracker::get_forward_route_lane_sequence(
   std::unordered_set<lanelet::Id> visited_ids{reference_lane_id};
   lanelet::Id current_id = reference_lane_id;
 
-  // Walk the on-route straight continuation, adding a full window of downstream length beyond the
-  // reference lane: the ego can be anywhere along the reference lane, so covering that extra window
-  // guarantees an object (or a dodge crossing) up to downstream_length_m ahead of the ego is in the
-  // sequence. Under the onset scope gate a route-primitive successor exists at each straight step.
+  // Walk the on-route straight continuation, adding a full window beyond the reference lane.
   double downstream_length = 0.0;
   while (downstream_length < downstream_length_m) {
     const auto next_ids = next_lane_ids(current_id);
@@ -207,9 +204,7 @@ std::optional<lanelet::Id> LaneTracker::select_current_lane_id(const LaneEventIn
   const auto & odom_pos = input.odometry_ptr->pose.pose.position;
   const lanelet::BasicPoint2d ego_pt{odom_pos.x, odom_pos.y};
 
-  // Prefer a route primitive the ego is inside; R-tree query avoids a whole-map scan each cycle.
-  // Not lanelet2_utils::get_road_lanelets_at: that filters by subtype=="road", excluding any
-  // lanelet without that attribute, whereas the ego's actual containing lane must always win.
+  // Prefer a route primitive the ego is inside; the R-tree query avoids a whole-map scan.
   const lanelet::BoundingBox2d query_box(ego_pt, ego_pt);
   std::optional<lanelet::Id> off_route_lane_id;
   for (const auto & candidate_lane : lanelet_map_ptr_->laneletLayer.search(query_box)) {
@@ -254,8 +249,7 @@ tl::expected<void, std::string> LaneTracker::update(const LaneEventInput & input
 
   debug_is_last_reanchor_blocked_ = false;
 
-  // A held reference lane is the normal state during an event, not a failure; see README.md,
-  // "Holding the reference lane".
+  // A held reference lane is normal during an event (README.md, "Holding the reference lane").
   if (is_reference_lane_held_) {
     return {};
   }

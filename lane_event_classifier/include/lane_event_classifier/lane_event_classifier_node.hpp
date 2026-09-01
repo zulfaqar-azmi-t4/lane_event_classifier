@@ -60,22 +60,10 @@ private:
     const autoware_planning_msgs::msg::Trajectory::ConstSharedPtr & trajectory_msg);
   void build_classifiers();
 
-  /**
-   * @brief Returns true when the tracking state can no longer be trusted and must be reset.
-   *
-   * Triggers on a reposition jump (localization discontinuity), the ego straying far from a held
-   * reference lane (e.g. a manual takeover that drives away from the route), or an unheld
-   * reference lane stuck unreachable-forward and far from the ego for
-   * stuck_reanchor_reset_duration_s (the tracker only ever re-anchors on forward progress, so it
-   * would otherwise stay stuck forever). Advances the ego-pose bookkeeping each cycle and records
-   * the cause in tracking_reset_reason_ for reset_tracking_state() to log.
-   */
+  /** @brief Returns true when the tracking state can no longer be trusted and must be reset. */
   tl::expected<void, std::string> check_tracking_state();
 
-  /**
-   * @brief Resets the tracking state: restarts the classifiers from LANE_FOLLOWING and releases the
-   * reference-lane hold so it re-anchors, logging the cause recorded by check_tracking_state().
-   */
+  /** @brief Resets the tracking state: restarts the classifiers and releases the lane hold. */
   void reset_tracking_state(const std::string & tracking_reset_reason);
 
   // Publishers
@@ -110,8 +98,7 @@ private:
   LaneEventInput input_;
   LaneTracker lane_tracker_;
 
-  // Lane-following check — evaluated here (outside any classifier) and reported alongside the
-  // state.
+  // Lane-following check — evaluated outside any classifier and reported with the state.
   LaneFollowingChecker lane_following_checker_;
 
   autoware::vehicle_info_utils::VehicleInfo vehicle_info_;
@@ -122,12 +109,10 @@ private:
   // Classifiers — instantiated in build_classifiers()
   std::vector<std::unique_ptr<LaneEventClassifierBase>> classifiers_;
 
-  // Previous ego pose, speed and stamp — a step exceeding the motion those speeds explain is a
-  // reposition jump and resets the tracking state.
+  // Previous ego motion — a step larger than those speeds explain is a reposition jump.
   std::optional<EgoMotionSample> previous_ego_motion_;
 
-  // Debounces an unheld reference lane being stuck (unreachable-forward and far from the ego)
-  // before resetting, so a legitimate in-progress lane change/crossing is not aborted mid-maneuver.
+  // Debounces a stuck unheld reference lane before the node resets the tracking state.
   DebouncedSignal<bool> stuck_reanchor_signal_;
 };
 

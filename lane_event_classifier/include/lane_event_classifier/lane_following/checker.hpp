@@ -50,9 +50,7 @@ struct LaneFollowingResult
 /** @brief Returns a short label for the reason (debug tracing / logging only). */
 [[nodiscard]] std::string_view to_debug_string(LaneFollowingReason reason);
 
-/** @brief Runs the lane-following check and reports which rule decided the outcome. See
-docs/lane_following.md
- */
+/** @brief Runs the lane-following check and reports the deciding rule (docs/lane_following.md). */
 class LaneFollowingChecker
 {
 public:

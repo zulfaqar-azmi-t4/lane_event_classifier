@@ -44,13 +44,11 @@ struct LaneCrossingCrossing
 /** @brief The boundary / footprint half of the per-cycle lane-crossing observation. */
 struct LaneCrossingObservation
 {
-  // A valid onset crossing (on-route-straight scope gate + exemptions passed); nullopt otherwise.
-  // Predictive — populated from the trajectory, even while the footprint is still inside the lane.
+  // Onset: a predictive crossing that passed the scope gate and the exemptions; else nullopt.
   std::optional<LaneCrossingCrossing> crossing;
   // Return / completion: the footprint is fully inside a lane of the reference straight sequence.
   bool is_footprint_inside_reference_sequence{false};
-  // Full-entry escape: a non-sequence lane the footprint is fully inside — the move is a lane
-  // change.
+  // Full-entry escape: a non-sequence lane the footprint is fully inside, so it is a lane change.
   std::optional<lanelet::Id> full_entry_lane_id;
   // Scope gate: the reference lane is on-route and going straight keeps the ego on-route.
   bool is_on_route_straight{false};
@@ -58,15 +56,7 @@ struct LaneCrossingObservation
   std::string debug_crossing_diagnostic;
 };
 
-/**
- * @brief The boundary / footprint half of the lane-crossing policy layer.
- *
- * Scope gate, onset crossing, return, and full-entry escape over a LaneTracker's generic queries:
- * the tracker stays a map/geometry library and knows nothing about crossings; this class interprets
- * its queries. The perceived-object half lives in LaneCrossingObjects. It is a plain value type
- * holding the boundary thresholds and is injected into the classifier (dependency injection). Onset
- * is predictive, mirroring LaneChangeGeometry.
- */
+/** @brief The boundary / footprint half of the lane-crossing policy layer. */
 class LaneCrossingGeometry
 {
 public:
@@ -127,24 +117,14 @@ private:
     const std::unordered_set<lanelet::Id> & sequence_ids,
     const std::vector<lanelet::Id> & footprint_ids);
 
-  double crossing_look_ahead_m_;           // fore/aft reach for the route-sequence membership set,
-                                           // and the boundary-length fallback when no trajectory is
-                                           // available (the departure scan itself uses the planned
-                                           // trajectory's own length)
-  double footprint_boundary_overshoot_m_;  // min body overshoot past the boundary for the footprint
-                                           // (physical) crossing source
-  double
-    predictive_lateral_trigger_distance_m_;  // max nearest distance from the ego footprint to
-                                             // the crossed-side boundary for the predictive
-                                             // (trajectory) source to onset: it fires only once
-                                             // the body has drifted close to the boundary it
-                                             // will cross, not off a dodge merely planned ahead
-  double footprint_crossing_object_proximity_m_;  // max distance from the poking footprint corner
-                                                  // to a candidate object for the physical
-                                                  // (footprint) source to onset: ties the crossing
-                                                  // to the object it dodges, rather than any
-                                                  // candidate merely qualifying within the far
-                                                  // longer object_longitudinal_window_m
+  // Fore/aft reach for the route-sequence membership set, and the boundary-length fallback.
+  double crossing_look_ahead_m_;
+  // Min body overshoot past the boundary for the physical (footprint) crossing source.
+  double footprint_boundary_overshoot_m_;
+  // Max ego-footprint distance to the crossed-side boundary for the predictive source to onset.
+  double predictive_lateral_trigger_distance_m_;
+  // Max distance from the poking footprint corner to the candidate object it dodges.
+  double footprint_crossing_object_proximity_m_;
 
   mutable StraightLaneSequenceCache lane_sequence_cache_;
 };

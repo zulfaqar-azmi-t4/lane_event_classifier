@@ -12,13 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Trajectory-driven intentional-lane-crossing tests (see docs/lane_crossing.md) on the real test
-// map (test/map/lanelet2_map.osm). The primitive sequence 47 -> 1167 -> 51 -> 55 runs in the left
-// lane of the three-lane bundle 47|48|50 (left->right); 48 is the off-route neighbour to the right
-// of 47. A crossing is the ego dodging an object in 47 by poking toward 48 and returning: the
-// planned path leaves the lane sequence around the object (out before it, back after it) and comes
-// back. Trajectories are built from the map's centerlines; the ego is driven through cycles by
-// advancing the message stamp.
+// Trajectory-driven lane-crossing tests on the real test map (see docs/lane_crossing.md).
 
 #include "synthetic_lanelet_maps.hpp"
 
@@ -96,10 +90,7 @@ lanelet::BasicPoint2d nearest_point_on(
   return nearest;
 }
 
-// A point inset_m inside lane id's right boundary at longitudinal fraction frac (still inside the
-// lane, close to the shared 47|48 boundary). Places the ego laterally near the crossed boundary so
-// the predictive lateral-proximity gate is satisfied, mirroring the real onset where the body has
-// already drifted toward the line it dodges across.
+// A point inset_m inside lane id's right boundary, so the lateral-proximity gate is satisfied.
 lanelet::BasicPoint2d point_near_right_boundary(
   const lanelet::LaneletMapPtr & map, lanelet::Id id, double frac, double inset_m)
 {
@@ -133,9 +124,7 @@ lanelet::BasicPoint2d point_near_left_boundary(
   return boundary_point + inward * inset_m;
 }
 
-// Builds a trajectory that starts on lane_ids.front() and sweeps laterally through the listed lanes
-// (in order) while advancing forward along the first lane. A single sweep {47, 48} commits to the
-// neighbour and never returns - the lane-change signature, not a crossing.
+// Builds a trajectory that sweeps laterally through the listed lanes while advancing forward.
 std::vector<lanelet::BasicPoint2d> build_lane_trajectory(
   const lanelet::LaneletMapPtr & map, const std::vector<lanelet::Id> & lane_ids, double start_frac,
   double end_frac, std::size_t point_count)
@@ -167,10 +156,7 @@ std::vector<lanelet::BasicPoint2d> build_lane_trajectory(
   return trajectory;
 }
 
-// Builds an out-and-back poke: the ego advances along base_id while the lateral offset follows a
-// triangle (0 -> 1 -> 0) toward poke_id, so the path crosses the shared boundary on the way out and
-// again on the way back without committing to the neighbour lane. This is the closed departure the
-// bracket onset detects (exit, then re-enter), unlike a lane change whose path commits fully.
+// Builds an out-and-back poke toward poke_id: the closed departure the bracket onset detects.
 std::vector<lanelet::BasicPoint2d> build_out_and_back_trajectory(
   const lanelet::LaneletMapPtr & map, lanelet::Id base_id, lanelet::Id poke_id, double start_frac,
   double end_frac, std::size_t point_count)
@@ -191,8 +177,7 @@ std::vector<lanelet::BasicPoint2d> build_out_and_back_trajectory(
   return trajectory;
 }
 
-// Builds the tail of a poke: the path starts on poke_id and returns onto base_id, so it crosses the
-// shared boundary once, inbound. The departure it belongs to exited behind the first sample.
+// Builds the tail of a poke: the path starts on poke_id and crosses back onto base_id once.
 std::vector<lanelet::BasicPoint2d> build_back_only_trajectory(
   const lanelet::LaneletMapPtr & map, lanelet::Id base_id, lanelet::Id poke_id, double start_frac,
   double end_frac, std::size_t point_count)
@@ -224,9 +209,7 @@ std::vector<lanelet::BasicPoint2d> footprint_box(const lanelet::BasicPoint2d & c
     {center.x() - half, center.y() + half}};
 }
 
-// Builds a footprint quad straddling lane 47's right boundary (shared with 48): its far edge sits
-// far_m into 48 (the overshoot the physical source measures) and its near edge near_m back inside
-// 47. Used to drive the physical footprint crossing directly, independent of the trajectory.
+// Builds a footprint quad straddling lane 47's right boundary, far_m into 48 and near_m into 47.
 std::vector<lanelet::BasicPoint2d> build_straddle_footprint(
   const lanelet::LaneletMapPtr & map, double near_m, double far_m)
 {
@@ -245,8 +228,7 @@ std::vector<lanelet::BasicPoint2d> build_straddle_footprint(
   return {b1 - normal * near_m, b1 + normal * far_m, b2 + normal * far_m, b2 - normal * near_m};
 }
 
-// Drives one cycle exactly as the node does: update the tracker, run the classifier, then hold or
-// release the reference lane based on whether a crossing is active.
+// Drives one cycle exactly as the node does: update, classify, then hold or release.
 class Simulator
 {
 public:
@@ -312,8 +294,7 @@ std::pair<int32_t, uint32_t> stamp_from_ms(int64_t total_ms)
     static_cast<int32_t>(total_ms / 1000), static_cast<uint32_t>((total_ms % 1000) * 1'000'000)};
 }
 
-// Drives an out-and-back poke over the 47|48 boundary with an object ahead in 47 for up to
-// max_cycles, returning true once a crossing onsets. Shared by the onset-positive tests.
+// Drives an out-and-back poke with an object ahead, returning true once a crossing onsets.
 bool run_until_crossing(
   Simulator & sim, const std::vector<lanelet::Id> & route,
   const std::vector<lanelet::BasicPoint2d> & trajectory, const lanelet::BasicPoint2d & ego,
@@ -333,9 +314,7 @@ bool run_until_crossing(
 }
 }  // namespace
 
-// Onset then completion: ego in 47 going straight on-route (47 -> 1167), an object in 47 ahead, the
-// trajectory pokes out toward off-route lane 48 and back around it -> INTENTIONAL_LANE_CROSSING;
-// the footprint returning fully inside 47 completes the crossing.
+// Onset then completion: a poke around an object onsets, and the return inside 47 completes it.
 TEST(LaneCrossingTest, onset_then_return_completes)
 {
   auto map = load_test_map();
@@ -375,9 +354,7 @@ TEST(LaneCrossingTest, onset_then_return_completes)
   EXPECT_TRUE(completed) << "footprint back inside 47 for the settle window should complete";
 }
 
-// Onset exemption: 176949 is a road shoulder sharing 47's left boundary. A predictive dodge that
-// brackets an object and pokes toward it is never an intentional crossing — crossing to a road
-// shoulder is always lane following (docs/lane_crossing.md, "Exemptions").
+// Onset exemption: a dodge toward road shoulder 176949 is lane following, not a crossing.
 TEST(LaneCrossingTest, dodge_toward_road_shoulder_is_not_a_crossing)
 {
   auto map = load_test_map();
@@ -405,10 +382,7 @@ TEST(LaneCrossingTest, dodge_toward_road_shoulder_is_not_a_crossing)
   }
 }
 
-// Trajectory already outside the sequence at its first sample: the lateral gate only opens once the
-// body is at the line, by which point the planner's nearest sample can sit in 48. The inbound
-// crossing closes a departure that exited behind the ego, so the ego position stands in for the
-// exit and the object ahead is still bracketed -> INTENTIONAL_LANE_CROSSING.
+// A trajectory already outside the sequence still onsets: the ego stands in for the exit.
 TEST(LaneCrossingTest, trajectory_starting_outside_the_sequence_still_onsets)
 {
   auto map = load_test_map();
@@ -429,8 +403,7 @@ TEST(LaneCrossingTest, trajectory_starting_outside_the_sequence_still_onsets)
     << sim.debug_reason();
 }
 
-// No object: the identical out-and-back poke with no obstacle is never a crossing (a plain drift or
-// a chatter poke, with nothing to go around, is not an intentional crossing).
+// No object: the identical out-and-back poke with nothing to go around is never a crossing.
 TEST(LaneCrossingTest, no_object_is_not_a_crossing)
 {
   auto map = load_test_map();
@@ -452,11 +425,7 @@ TEST(LaneCrossingTest, no_object_is_not_a_crossing)
   }
 }
 
-// Lateral-proximity gate on the predictive source: the trajectory pokes out and back around an
-// object ahead (a closed departure that brackets a candidate), but the ego is still centred in lane
-// 47, far from the crossed boundary. The dodge is only planned; the body has not drifted toward the
-// line, so the predictive source must NOT onset. This is the field case where a plan far ahead
-// flipped the state into INTENTIONAL_LANE_CROSSING while the ego sat centred (and stationary).
+// Lateral-proximity gate: a poke planned while the ego stays centred must not onset.
 TEST(LaneCrossingTest, centered_ego_far_from_boundary_does_not_predictively_onset)
 {
   auto map = load_test_map();
@@ -483,10 +452,7 @@ TEST(LaneCrossingTest, centered_ego_far_from_boundary_does_not_predictively_onse
   }
 }
 
-// A monotonic sweep into the neighbour commits to it and never returns within the look-ahead: that
-// is a lane change, not a crossing, so no closed departure forms and onset never fires even with an
-// object present. The full-entry footprint escape is a backstop; this rejects it earlier, at the
-// trajectory geometry.
+// A monotonic sweep into the neighbour forms no closed departure, so onset never fires.
 TEST(LaneCrossingTest, monotonic_sweep_into_neighbour_is_not_a_crossing)
 {
   auto map = load_test_map();
@@ -513,9 +479,7 @@ TEST(LaneCrossingTest, monotonic_sweep_into_neighbour_is_not_a_crossing)
   }
 }
 
-// A moving object qualifies: the object need not be static. The ego pokes out and back around a
-// slow-moving obstacle, so the closed departure brackets it -> INTENTIONAL_LANE_CROSSING. (A moving
-// object the ego merely follows straight produces no departure, so it cannot onset on its own.)
+// A moving object qualifies: the closed departure around a slow-moving obstacle still onsets.
 TEST(LaneCrossingTest, moving_object_can_qualify)
 {
   auto map = load_test_map();
@@ -535,9 +499,7 @@ TEST(LaneCrossingTest, moving_object_can_qualify)
     << "a moving object the ego dodges around still qualifies";
 }
 
-// Two staggered objects, only one at the poke: the closed departure need only bracket one candidate
-// (note: objects need not line up). A poke around the first object onsets even though the second is
-// elsewhere in the sequence.
+// Two staggered objects: the closed departure need only bracket one candidate to onset.
 TEST(LaneCrossingTest, staggered_objects_one_bracketed_is_a_crossing)
 {
   auto map = load_test_map();
@@ -560,8 +522,7 @@ TEST(LaneCrossingTest, staggered_objects_one_bracketed_is_a_crossing)
     << "bracketing one of several staggered objects is enough";
 }
 
-// Full-entry escape: once crossing, a footprint fully inside off-route lane 48 means the move is a
-// lane change, so the crossing classifier drops out (leaving the lane-change classifier to own it).
+// Full-entry escape: a footprint fully inside off-route lane 48 drops the crossing classifier.
 TEST(LaneCrossingTest, full_entry_into_adjacent_lane_escapes)
 {
   auto map = load_test_map();
@@ -579,8 +540,7 @@ TEST(LaneCrossingTest, full_entry_into_adjacent_lane_escapes)
   int64_t time_ms = 0;
   ASSERT_TRUE(run_until_crossing(sim, route, crossing_trajectory, ego_in_47, objects, 10, time_ms));
 
-  // Footprint fully inside off-route lane 48, ego now past the object (object behind): with nothing
-  // left to cross for, a full crossover is a lane change, not a crossing.
+  // The footprint is fully inside 48 with the object behind, so it is a lane change.
   const auto point_in_48 = point_at_fraction(centerline_points(map, 48), 0.8);
   const auto footprint_48 = footprint_box(point_in_48);
   const auto through_48_trajectory = build_lane_trajectory(map, {48}, 0.7, 0.95, 20);
@@ -593,9 +553,7 @@ TEST(LaneCrossingTest, full_entry_into_adjacent_lane_escapes)
     << "full entry into 48 past the object is a lane change, not a crossing";
 }
 
-// Candidate-object memory: the object is perceived while the ego approaches (latching the memory),
-// then perception drops it entirely exactly as the ego dodges past. The remembered candidate must
-// still let the bracket onset fire (mirrors the real perception dropout at the crossing moment).
+// Candidate-object memory: a perception dropout at the crossing moment must still let onset fire.
 TEST(LaneCrossingTest, candidate_memory_bridges_perception_dropout)
 {
   auto map = load_test_map();
@@ -621,8 +579,7 @@ TEST(LaneCrossingTest, candidate_memory_bridges_perception_dropout)
       objects));
     time_ms += 100;
   }
-  // Phase 2: the ego dodges while perception drops the object entirely. The remembered candidate
-  // must still let onset fire.
+  // Phase 2: the ego dodges while perception drops the object, so the memory must carry onset.
   bool became_crossing = false;
   for (int cycle = 0; cycle < 6; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
@@ -639,10 +596,7 @@ TEST(LaneCrossingTest, candidate_memory_bridges_perception_dropout)
     << "a candidate seen a moment ago should bridge a transient perception dropout";
 }
 
-// Physical (footprint) source: the shallow-dodge case. The planned trajectory stays straight
-// in-lane (no centerline departure at all), but the ego body pokes well past the 47|48 boundary
-// while an object is ahead in 47. The physical footprint source must onset even though the
-// trajectory bracket finds nothing - this is the field case the centerline-only detector missed.
+// Physical source: a shallow dodge onsets on the body alone, with no centerline departure.
 TEST(LaneCrossingTest, footprint_over_boundary_is_a_crossing)
 {
   auto map = load_test_map();
@@ -676,10 +630,7 @@ TEST(LaneCrossingTest, footprint_over_boundary_is_a_crossing)
     << "the body poking past the boundary is a crossing even on an in-lane path";
 }
 
-// Proximity guard: the body pokes over the boundary, and a candidate object qualifies (touches the
-// sequence, ahead within object_longitudinal_window_m) but sits far from the poking corner. Without
-// tying the footprint source to the object it dodges, any qualifying object anywhere in the window
-// would onset a crossing off an unrelated body overhang (e.g. cornering at a curve).
+// Proximity guard: a candidate object far from the poking corner must not onset a crossing.
 TEST(LaneCrossingTest, footprint_over_boundary_with_distant_object_is_not_a_crossing)
 {
   auto map = load_test_map();
@@ -707,9 +658,7 @@ TEST(LaneCrossingTest, footprint_over_boundary_with_distant_object_is_not_a_cros
   }
 }
 
-// Cornering guard: a body that only slightly overhangs the boundary (below
-// footprint_boundary_overshoot_m) with a straight in-lane path is a cornering graze, not a
-// crossing.
+// Cornering guard: an overhang below footprint_boundary_overshoot_m is a graze, not a crossing.
 TEST(LaneCrossingTest, slight_cornering_overhang_is_not_a_crossing)
 {
   auto map = load_test_map();
@@ -737,10 +686,7 @@ TEST(LaneCrossingTest, slight_cornering_overhang_is_not_a_crossing)
   }
 }
 
-// No time cap: a slow, long dodge (the body sits over the boundary far longer than the old 10 s
-// backstop) must stay INTENTIONAL_LANE_CROSSING until the ego actually returns, not force-complete
-// mid-excursion. Force-completing mid-dodge is what let the reference migrate to the off-route
-// neighbour and read the return as a lane change.
+// No time cap: a slow, long dodge holds the crossing until the ego actually returns.
 TEST(LaneCrossingTest, long_dodge_does_not_time_out)
 {
   auto map = load_test_map();
@@ -773,8 +719,7 @@ TEST(LaneCrossingTest, long_dodge_does_not_time_out)
   }
   ASSERT_TRUE(became_crossing);
 
-  // Hold the body over the boundary for 20 s - well past the old 10 s backstop. It must stay a
-  // crossing the whole time (no time-based completion).
+  // Hold the body over the boundary for 20 s: it must stay a crossing the whole time.
   for (int cycle = 0; cycle < 200; ++cycle) {
     time_ms += 100;
     const auto [sec, nsec] = stamp_from_ms(time_ms);
@@ -804,9 +749,7 @@ TEST(LaneCrossingTest, long_dodge_does_not_time_out)
   EXPECT_TRUE(completed) << "returning fully inside 47 completes the crossing";
 }
 
-// Ending requires the ego to be fully inside one lane. A straddling ego (not fully in the route,
-// not fully in a neighbour) holds the crossing even after the object is gone - it does NOT end mid-
-// straddle. The ego is expected to settle fully into a lane (by manual override or reposition).
+// Ending requires the ego to be fully inside one lane, so a straddling ego holds the crossing.
 TEST(LaneCrossingTest, object_gone_while_straddling_stays_crossing)
 {
   auto map = load_test_map();
@@ -838,8 +781,7 @@ TEST(LaneCrossingTest, object_gone_while_straddling_stays_crossing)
   }
   ASSERT_TRUE(became_crossing);
 
-  // The object is gone but the ego keeps straddling (never fully in 47, never fully in 48). The
-  // crossing must hold - it is not fully inside any lane, so there is nothing to end into.
+  // The object is gone but the ego keeps straddling, so there is nothing to end into.
   for (int cycle = 0; cycle < 60; ++cycle) {
     time_ms += 100;
     const auto [sec, nsec] = stamp_from_ms(time_ms);
@@ -851,9 +793,7 @@ TEST(LaneCrossingTest, object_gone_while_straddling_stays_crossing)
   }
 }
 
-// Full entry ends the crossing even with an object still ahead: once the whole footprint is fully
-// inside the neighbour lane 48, the ego has committed, so the crossing ends and the move is handed
-// to the lane-change classifier - regardless of any object still ahead in the route lane.
+// Full entry ends the crossing even with an object still ahead: the ego has committed.
 TEST(LaneCrossingTest, full_crossover_ends_even_with_object_ahead)
 {
   auto map = load_test_map();
@@ -884,10 +824,7 @@ TEST(LaneCrossingTest, full_crossover_ends_even_with_object_ahead)
     << "a full crossover into the neighbour ends the crossing (now a lane change)";
 }
 
-// Mutual exclusion with lane change: from off-route lane 48 a move toward route primitive 47 is a
-// lane change, not a crossing. The on-route-straight condition (reference must be an on-route
-// primitive with an on-route straight successor) fails for 48, so no crossing fires even with an
-// object present.
+// Mutual exclusion: from off-route 48 the scope gate fails, so no crossing fires.
 TEST(LaneCrossingTest, lane_change_regime_is_not_a_crossing)
 {
   auto map = load_test_map();

@@ -38,8 +38,7 @@ struct LaneChangeCrossing
 /** @brief Per-cycle lane-change geometry the classifier reasons over. */
 struct LaneChangeObservation
 {
-  // A valid onset crossing (heads to a route primitive, exemptions passed); nullopt otherwise.
-  // Predictive — populated even while the footprint is still inside the reference lane.
+  // Onset: a predictive crossing toward a route primitive, exemptions passed; else nullopt.
   std::optional<LaneChangeCrossing> crossing;
   // Abort observation: the trajectory heads back into the reference lane (no forward crossing).
   bool trajectory_returns_to_reference{false};
@@ -51,13 +50,7 @@ struct LaneChangeObservation
   std::optional<lanelet::Id> settle_lane_id;
 };
 
-/**
- * @brief Computes the per-cycle lane-change observation from a LaneTracker's generic queries.
- *
- * This is the lane-change policy layer (onset, exemptions, abort, and settle): the tracker stays a
- * map/geometry library and knows nothing about lane changes; this class interprets its queries. See
- * docs/lane_change.md.
- */
+/** @brief Computes the per-cycle lane-change observation from a LaneTracker's queries. */
 class LaneChangeGeometry
 {
 public:

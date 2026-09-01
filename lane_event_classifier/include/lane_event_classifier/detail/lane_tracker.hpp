@@ -43,12 +43,7 @@ struct ReferenceLane
   bool is_reference_lane_right_bound_virtual{false};  // right bound is a virtual linestring
 };
 
-/** @brief Owns the map, routing graph, and reference lane; provides generic lane queries.
- *
- * This is a map/geometry library: it tracks the reference lane and answers stateless lane queries,
- * but knows nothing about any specific lane event. Event policy (e.g. lane-change crossing
- * geometry) lives in the classifiers, which consume these queries — see lane_change/geometry.hpp.
- */
+/** @brief Owns the map, routing graph, and reference lane; provides generic lane queries. */
 class LaneTracker
 {
 public:
@@ -110,22 +105,11 @@ public:
   /** @brief Ids of the given lane's longitudinal next lanes (routing following). */
   [[nodiscard]] std::vector<lanelet::Id> next_lane_ids(lanelet::Id lane_id) const;
 
-  /** @brief The ordered, forward-only on-route straight sequence starting at the given lane: the
-   * lane itself followed by each route-primitive straight successor, accumulating at least
-   * downstream_length_m of lane length beyond the starting lane.
-   *
-   * Unlike the fore/aft membership set of get_straight_lane_sequence_ids
-   * (detail/lane_sequence.hpp), this is a forward-only, route-filtered, *ordered* run of lanelets,
-   * suitable for concatenating boundaries or measuring forward arc length along the lane sequence.
-   * Returned by value; empty if the lane id is unknown.
-   */
+  /** @brief The ordered, forward-only on-route straight sequence starting at the given lane. */
   [[nodiscard]] lanelet::ConstLanelets get_forward_route_lane_sequence(
     lanelet::Id reference_lane_id, double downstream_length_m) const;
 
-  /** @brief Returns true if lane_id is a preferred primitive of the current route.
-   *
-   * O(1) lookup against the route-primitive set cached in update(); the set is rebuilt only when
-   * the route changes (new uuid == new route_ptr). */
+  /** @brief Returns true if lane_id is a preferred primitive of the current route. */
   [[nodiscard]] bool is_route_primitive(lanelet::Id lane_id) const;
 
   /** @brief Lanelet the ego centre was found in on the last update() (InvalId if none/held). */
@@ -134,8 +118,7 @@ public:
     return debug_last_selected_lane_id_;
   }
 
-  /** @brief True when the last update() could not advance the reference lane
-   * (stale/off-sequence). */
+  /** @brief True when the last update() could not advance the reference lane. */
   [[nodiscard]] bool debug_is_last_reanchor_blocked() const
   {
     return debug_is_last_reanchor_blocked_;
@@ -146,8 +129,7 @@ private:
   std::unordered_set<lanelet::Id> update_primitive_route_ids(
     const autoware_planning_msgs::msg::LaneletRoute::ConstSharedPtr & route_ptr) const;
 
-  /** @brief Re-anchors the reference lane only on forward progress into a next lane, never on a
-   * lateral move. */
+  /** @brief Re-anchors the reference lane only on forward progress into a next lane. */
   std::optional<lanelet::Id> new_reference_lane_id(const LaneEventInput & input) const;
 
   /** @brief Anchors the reference lane onto the given lane and resolves its attribute flags. */
@@ -157,8 +139,7 @@ private:
   [[nodiscard]] std::optional<lanelet::Id> select_current_lane_id(
     const LaneEventInput & input) const;
 
-  /** @brief Returns true if candidate_lane_id is a next lane (routing following) of from_lane_id.
-   */
+  /** @brief Returns true if candidate_lane_id is a next lane of from_lane_id. */
   [[nodiscard]] bool is_lane_directly_connected(
     lanelet::Id from_lane_id, lanelet::Id candidate_lane_id) const;
 

@@ -12,10 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Tests for the lane-following check (LaneFollowingChecker) — the rules and patterns from
-// docs/lane_following.md, on both synthetic maps and the real test map (test/map). The check
-// lives outside the tracker: the LaneTracker supplies the map, routing graph and reference lane,
-// and LaneFollowingChecker::evaluate makes the following decision.
+// Tests for LaneFollowingChecker on synthetic maps and the real test map (docs/lane_following.md).
 
 #include "synthetic_lanelet_maps.hpp"
 
@@ -55,8 +52,7 @@ bool departed(
 
 // ── Synthetic rule tests ─────────────────────────────────────────────────────
 
-// distance_to_lane backs the held-reference departure reset: it is zero while the ego is inside
-// the lane and grows with how far the ego has strayed outside it (nullopt for an unknown lane).
+// distance_to_lane is zero inside the lane and grows with how far the ego has strayed outside.
 TEST(LaneTrackerTest, distance_to_lane_measures_departure_from_the_lane)
 {
   lanelet::Id lane_id{};
@@ -72,8 +68,7 @@ TEST(LaneTrackerTest, distance_to_lane_measures_departure_from_the_lane)
   EXPECT_FALSE(tracker.distance_to_lane(lanelet::InvalId, {5.0, 0.0}).has_value());
 }
 
-// Entering a next lane (forward driving across a lanelet boundary) is not a lateral departure;
-// moving into a lane that is neither the reference lane nor a next lane is.
+// Entering a next lane is not a departure; entering any other lane is.
 TEST(LaneFollowingTest, next_lane_is_not_departure_lateral_is)
 {
   lanelet::Id id_a{};
@@ -95,8 +90,7 @@ TEST(LaneFollowingTest, next_lane_is_not_departure_lateral_is)
   EXPECT_TRUE(departed(checker, tracker, {5.0, 5.0}));  // lateral: neither reference lane nor next
 }
 
-// An off-route reference lane still departs on a lateral exit (lane_a has no next lane here, so the
-// exit cannot be forward driving).
+// An off-route reference lane still departs on a lateral exit.
 TEST(LaneFollowingTest, off_route_reference_lane_departs_on_lateral_exit)
 {
   lanelet::Id id_a{};
@@ -118,8 +112,7 @@ TEST(LaneFollowingTest, off_route_reference_lane_departs_on_lateral_exit)
   EXPECT_TRUE(departed(checker, tracker, {5.0, 3.0}));   // lateral exit → departure
 }
 
-// An off-route reference lane driving forward into its OWN next lane is lane following, not a
-// departure.
+// An off-route reference lane driving into its own next lane is lane following.
 TEST(LaneFollowingTest, off_route_forward_into_next_lane_is_not_departure)
 {
   lanelet::Id id_a{};
@@ -140,8 +133,7 @@ TEST(LaneFollowingTest, off_route_forward_into_next_lane_is_not_departure)
   EXPECT_FALSE(departed(checker, tracker, {15.0, 0.0}));  // in lane_a's own next lane → forward
 }
 
-// A reference point in the reference lane's PREVIOUS lane is still on the corridor, not a
-// departure.
+// A reference point in the reference lane's previous lane is still on the corridor.
 TEST(LaneFollowingTest, reference_point_in_previous_lane_is_not_departure)
 {
   lanelet::Id id_a{};
@@ -161,8 +153,7 @@ TEST(LaneFollowingTest, reference_point_in_previous_lane_is_not_departure)
   EXPECT_FALSE(departed(checker, tracker, {8.0, 0.0}));  // in lane_a — the previous lane
 }
 
-// within_lateral_tolerance: a reference point just outside the lane but within the lateral
-// tolerance is still following; beyond the tolerance it departs.
+// within_lateral_tolerance: inside the tolerance is following, beyond it is a departure.
 TEST(LaneFollowingTest, within_lateral_tolerance_is_not_departure)
 {
   lanelet::Id id{};
@@ -253,8 +244,7 @@ TEST(LaneFollowingTest, crossing_virtual_boundary_is_not_departure)
   EXPECT_TRUE(departed(checker_no_virtual, tracker, {5.0, 3.0}));  // exemption off → departs
 }
 
-// The virtual-boundary exemption only applies abreast of the lane. Past its end the ego never
-// crossed that bound laterally, so the nearest-bound distance there must not exempt it.
+// The virtual-boundary exemption only applies abreast of the lane, never past its end.
 TEST(LaneFollowingTest, beyond_the_lane_end_the_virtual_boundary_does_not_exempt)
 {
   lanelet::Id id{};
@@ -301,8 +291,7 @@ struct Scenario
 };
 }  // namespace
 
-// Regression: the three logged bag positions that used to fire a false LANE_CHANGING are all lane
-// following once the reference lane is anchored to the lanelet the ego is actually in.
+// Regression: the three logged bag positions that fired a false LANE_CHANGING are all following.
 TEST(LaneFollowingMapTest, logged_false_positive_positions_are_following)
 {
   auto map = load_test_map();
@@ -359,9 +348,7 @@ TEST(LaneFollowingMapTest, logged_false_positive_positions_are_following)
   }
 }
 
-// inside_connected_sequence: the connected lane sequence spans multiple hops. Reference lane 47,
-// ego two hops down in 51 (47 -> 1167 -> 51). Full sequence length → following; a short sequence
-// (exemptions off to isolate the connected-sequence check) → departs.
+// inside_connected_sequence: the connected lane sequence spans multiple hops (47 -> 1167 -> 51).
 TEST(LaneFollowingMapTest, connected_sequence_spans_multiple_hops)
 {
   auto map = load_test_map();
@@ -390,8 +377,7 @@ TEST(LaneFollowingMapTest, connected_sequence_spans_multiple_hops)
     check_following(short_checker, tracker, point_in_51).is_following);  // 51 unreachable
 }
 
-// Raw prompt: route runs on 1167 -> 51, but the ego drives the parallel corridor 1169 -> 52
-// (off-route). This is lane following, not a lane change.
+// The ego driving the parallel off-route corridor 1169 -> 52 is lane following, not a change.
 TEST(LaneFollowingMapTest, off_route_parallel_corridor_is_following)
 {
   auto map = load_test_map();
@@ -416,10 +402,7 @@ TEST(LaneFollowingMapTest, off_route_parallel_corridor_is_following)
   EXPECT_TRUE(check_following(checker, tracker, point_in_52).is_following);
 }
 
-// Same idea but isolated from the turn / virtual exemptions: 51 and 52 are parallel non-turn road
-// lanes with solid bounds. With the route on 51 and the ego in 52, the reference lane anchors to
-// the ego's actual lane (52) and it is following its own connected sequence — reason
-// inside_connected_sequence, not a turn / virtual exemption.
+// The same case isolated from the exemptions: the reason is inside_connected_sequence.
 TEST(LaneFollowingMapTest, off_route_parallel_non_turn_lane_is_following)
 {
   auto map = load_test_map();
