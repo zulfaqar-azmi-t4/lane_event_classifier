@@ -69,11 +69,11 @@ void LaneEventClassifierNode::build_classifiers()
   classifiers_.emplace_back(
     std::make_unique<IntentionalCrossingClassifier>(
       params_.lane_crossing.enable_classifier, params_.lane_crossing, lane_tracker_,
-      LaneCrossingGeometry{
+      LaneCrossingGeometry{CrossingThresholds{
         params_.lane_crossing.crossing_look_ahead_m,
         params_.lane_crossing.footprint_boundary_overshoot_m,
         params_.lane_crossing.predictive_lateral_trigger_distance_m,
-        params_.lane_crossing.footprint_crossing_object_proximity_m},
+        params_.lane_crossing.footprint_crossing_object_proximity_m}},
       LaneCrossingObjects{params_.lane_crossing.object_longitudinal_window_m}));
 }
 

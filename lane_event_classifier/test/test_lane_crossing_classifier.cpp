@@ -237,9 +237,10 @@ public:
   Simulator(lanelet::LaneletMapPtr map, LaneCrossingConfig config)
   : classifier_{
       true, config, tracker_,
-      LaneCrossingGeometry{
+      LaneCrossingGeometry{CrossingThresholds{
         config.crossing_look_ahead_m, config.footprint_boundary_overshoot_m,
-        config.predictive_lateral_trigger_distance_m, config.footprint_crossing_object_proximity_m},
+        config.predictive_lateral_trigger_distance_m,
+        config.footprint_crossing_object_proximity_m}},
       LaneCrossingObjects{config.object_longitudinal_window_m}}
   {
     const auto result = tracker_.set_lanelet_map(map);

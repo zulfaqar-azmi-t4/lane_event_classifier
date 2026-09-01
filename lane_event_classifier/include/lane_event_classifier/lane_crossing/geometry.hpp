@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CROSSING__GEOMETRY_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CROSSING__GEOMETRY_HPP_
 
+#include <autoware_utils_geometry/boost_geometry.hpp>
 #include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
@@ -30,6 +31,42 @@
 
 namespace lane_event_classifier
 {
+
+/** @brief Lateral boundaries of the forward lane sequence. */
+struct LaneSequenceBounds
+{
+  autoware_utils_geometry::LineString2d left;
+  autoware_utils_geometry::LineString2d right;
+};
+
+/** @brief Where a detection source says the ego leaves the lane sequence. */
+struct CrossingCandidate
+{
+  bool is_to_left{false};
+  lanelet::BasicPoint2d point{0.0, 0.0};
+};
+
+/** @brief The forward lane sequence with its bounds and the ego clearance to each side. */
+struct LaneSequenceGeometry
+{
+  lanelet::ConstLanelets lane_sequence;
+  LaneSequenceBounds bounds;
+  double distance_to_left_boundary_m{0.0};
+  double distance_to_right_boundary_m{0.0};
+};
+
+/** @brief The thresholds the lane-crossing geometry measures against. */
+struct CrossingThresholds
+{
+  // Fore/aft reach for the route-sequence membership set, and the boundary-length fallback.
+  double crossing_look_ahead_m{0.0};
+  // Min body overshoot past the boundary for the physical (footprint) crossing source.
+  double footprint_boundary_overshoot_m{0.0};
+  // Max ego-footprint distance to the crossed-side boundary for the predictive source to onset.
+  double predictive_lateral_trigger_distance_m{0.0};
+  // Max distance from the poking footprint corner to the candidate object it dodges.
+  double footprint_crossing_object_proximity_m{0.0};
+};
 
 /** @brief Where the planned trajectory crosses the reference lane's lateral boundary. */
 struct LaneCrossingCrossing
@@ -60,9 +97,7 @@ struct LaneCrossingObservation
 class LaneCrossingGeometry
 {
 public:
-  LaneCrossingGeometry(
-    double crossing_look_ahead_m, double footprint_boundary_overshoot_m,
-    double predictive_lateral_trigger_distance_m, double footprint_crossing_object_proximity_m);
+  explicit LaneCrossingGeometry(CrossingThresholds thresholds);
 
   /** @brief Builds the observation for this cycle from the tracker's (already refreshed) state.
    * @param candidate_object_poses Objects the ego might cross to avoid (from LaneCrossingObjects):
@@ -107,6 +142,23 @@ private:
     const LaneTracker & tracker, const LaneEventContext & context,
     const CrossingRequest & request) const;
 
+  /** @brief The candidate chosen from the two sources, with the source label and diagnostic. */
+  struct SourceScan
+  {
+    std::optional<CrossingCandidate> candidate;
+    std::string source;
+    std::string debug_detail;
+  };
+
+  /** @brief Runs both detection sources and prefers the predictive one.
+   * @param tracker Generic lane queries.
+   * @param context Reference-lane geometry derived once for this cycle.
+   * @param request This cycle's crossing-detection inputs.
+   * @param sequence The forward lane sequence with its bounds and the ego clearance. */
+  [[nodiscard]] SourceScan scan_sources(
+    const LaneTracker & tracker, const LaneEventContext & context, const CrossingRequest & request,
+    const LaneSequenceGeometry & sequence) const;
+
   /** @brief True when the footprint is fully inside a lane of the reference straight sequence.
    * @param footprint_ids Lanes the footprint touches (computed once per cycle by observe). */
   [[nodiscard]] static bool compute_is_footprint_inside_reference_sequence(
@@ -121,14 +173,7 @@ private:
     const std::unordered_set<lanelet::Id> & sequence_ids,
     const std::vector<lanelet::Id> & footprint_ids);
 
-  // Fore/aft reach for the route-sequence membership set, and the boundary-length fallback.
-  double crossing_look_ahead_m_;
-  // Min body overshoot past the boundary for the physical (footprint) crossing source.
-  double footprint_boundary_overshoot_m_;
-  // Max ego-footprint distance to the crossed-side boundary for the predictive source to onset.
-  double predictive_lateral_trigger_distance_m_;
-  // Max distance from the poking footprint corner to the candidate object it dodges.
-  double footprint_crossing_object_proximity_m_;
+  CrossingThresholds thresholds_;
 };
 
 }  // namespace lane_event_classifier
