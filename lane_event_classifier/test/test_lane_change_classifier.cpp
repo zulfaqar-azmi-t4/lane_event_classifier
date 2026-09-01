@@ -138,7 +138,7 @@ class Simulator
 {
 public:
   Simulator(lanelet::LaneletMapPtr map, LaneChangeConfig config)
-  : classifier_{true, config, tracker_}
+  : classifier_{true, config, tracker_, LaneChangeGeometry{config.crossing_look_ahead_m}}
   {
     const auto result = tracker_.set_lanelet_map(map);
     EXPECT_TRUE(result.has_value());

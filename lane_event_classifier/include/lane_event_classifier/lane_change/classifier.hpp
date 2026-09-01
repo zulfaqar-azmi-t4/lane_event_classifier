@@ -33,7 +33,9 @@ using LaneChangeConfig = ::lane_event_classifier::Params::LaneChange;
 class LaneChangeClassifier : public LaneEventClassifierBase
 {
 public:
-  LaneChangeClassifier(bool enabled, LaneChangeConfig config, const LaneTracker & tracker);
+  LaneChangeClassifier(
+    bool enabled, LaneChangeConfig config, const LaneTracker & tracker,
+    LaneChangeGeometry geometry);
   void update(const LaneEventInput & input, const LaneEventContext & context) final;
   [[nodiscard]] std::optional<uint8_t> get_state() const final;
   [[nodiscard]] bool is_enabled() const final;
@@ -70,7 +72,7 @@ private:
   bool enabled_{false};
   LaneChangeConfig config_;
   const LaneTracker & tracker_;  // generic lane queries (owned by the node)
-  LaneChangeGeometry geometry_;  // derives the per-cycle observation from the tracker
+  LaneChangeGeometry geometry_;  // derives the per-cycle observation from the tracker (injected)
 
   Phase phase_{Phase::idle};
   std::string debug_reason_;

@@ -56,13 +56,16 @@ LaneEventClassifierNode::LaneEventClassifierNode(const rclcpp::NodeOptions & nod
 
 void LaneEventClassifierNode::build_classifiers()
 {
-  lane_following_checker_ = LaneFollowingChecker(params_.lane_following);
+  // Every subsystem is assembled the same way: config, then its policy layers by value.
+  lane_following_checker_ =
+    LaneFollowingChecker(params_.lane_following, LaneFollowingGeometry{params_.lane_following});
 
   // Vector order is the arbitration priority: lane change first, then intentional crossing.
   classifiers_.clear();
   classifiers_.emplace_back(
     std::make_unique<LaneChangeClassifier>(
-      params_.lane_change.enable_classifier, params_.lane_change, lane_tracker_));
+      params_.lane_change.enable_classifier, params_.lane_change, lane_tracker_,
+      LaneChangeGeometry{params_.lane_change.crossing_look_ahead_m}));
   classifiers_.emplace_back(
     std::make_unique<IntentionalCrossingClassifier>(
       params_.lane_crossing.enable_classifier, params_.lane_crossing, lane_tracker_,

@@ -33,6 +33,12 @@ namespace lane_event_classifier
 
 namespace
 {
+// Builds a checker the way the node does: config plus its policy layer by value.
+LaneFollowingChecker make_checker(const LaneFollowingConfig & config = {})
+{
+  return LaneFollowingChecker(config, LaneFollowingGeometry{config});
+}
+
 // Runs the check for the ego reference point against the tracker's reference lane.
 LaneFollowingResult check_following(
   const LaneFollowingChecker & checker, const LaneTracker & tracker,
@@ -87,7 +93,7 @@ TEST(LaneFollowingTest, next_lane_is_not_departure_lateral_is)
   tracker
     .hold_reference_lane();  // hold the reference lane so we can probe the relation test directly
 
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
   EXPECT_FALSE(departed(checker, tracker, {15.0, 0.0}));  // inside next lane lane_b
   EXPECT_TRUE(departed(checker, tracker, {5.0, 5.0}));  // lateral: neither reference lane nor next
 }
@@ -109,7 +115,7 @@ TEST(LaneFollowingTest, off_route_reference_lane_departs_on_lateral_exit)
   ASSERT_FALSE(tracker.reference_lane().debug_is_reference_lane_on_route);
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
   EXPECT_FALSE(departed(checker, tracker, {5.0, 0.0}));  // still inside off-route reference lane
   EXPECT_TRUE(departed(checker, tracker, {5.0, 3.0}));   // lateral exit → departure
 }
@@ -131,7 +137,7 @@ TEST(LaneFollowingTest, off_route_forward_into_next_lane_is_not_departure)
   ASSERT_FALSE(tracker.reference_lane().debug_is_reference_lane_on_route);
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
   EXPECT_FALSE(departed(checker, tracker, {15.0, 0.0}));  // in lane_a's own next lane → forward
 }
 
@@ -151,7 +157,7 @@ TEST(LaneFollowingTest, reference_point_in_previous_lane_is_not_departure)
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_b);
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
   EXPECT_FALSE(departed(checker, tracker, {8.0, 0.0}));  // in lane_a — the previous lane
 }
 
@@ -170,7 +176,7 @@ TEST(LaneFollowingTest, within_lateral_tolerance_is_not_departure)
 
   LaneFollowingConfig config;
   config.lateral_tolerance_m = 0.5;
-  LaneFollowingChecker checker(config);
+  const auto checker = make_checker(config);
 
   EXPECT_FALSE(departed(checker, tracker, {5.0, 2.3}));  // 0.3 m outside — within tolerance
   EXPECT_TRUE(departed(checker, tracker, {5.0, 2.8}));   // 0.8 m outside — beyond tolerance
@@ -191,12 +197,12 @@ TEST(LaneFollowingTest, overlapping_road_shoulder_is_not_departure)
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, road_id);
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;                          // default: road-shoulder exemption on
+  const auto checker = make_checker();                   // default: road-shoulder exemption on
   EXPECT_FALSE(departed(checker, tracker, {5.0, 3.0}));  // inside the road shoulder → following
 
   LaneFollowingConfig config;
   config.enable_road_shoulder_exemption = false;
-  LaneFollowingChecker checker_no_shoulder(config);
+  const auto checker_no_shoulder = make_checker(config);
   EXPECT_TRUE(departed(checker_no_shoulder, tracker, {5.0, 3.0}));  // exemption off → departs
 }
 
@@ -213,12 +219,12 @@ TEST(LaneFollowingTest, turn_lane_out_of_lane_is_not_departure)
     tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;                           // default: turn-lane exemption on
+  const auto checker = make_checker();                    // default: turn-lane exemption on
   EXPECT_FALSE(departed(checker, tracker, {5.0, 10.0}));  // far out of lane, but turn lane
 
   LaneFollowingConfig config;
   config.enable_turn_lane_exemption = false;
-  LaneFollowingChecker checker_no_turn(config);
+  const auto checker_no_turn = make_checker(config);
   EXPECT_TRUE(departed(checker_no_turn, tracker, {5.0, 10.0}));  // exemption off → departs
 }
 
@@ -235,14 +241,14 @@ TEST(LaneFollowingTest, crossing_virtual_boundary_is_not_departure)
     tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;  // default: virtual-boundary exemption on
+  const auto checker = make_checker();  // default: virtual-boundary exemption on
   EXPECT_FALSE(
     departed(checker, tracker, {5.0, 3.0}));  // across the virtual LEFT bound → following
   EXPECT_TRUE(departed(checker, tracker, {5.0, -3.0}));  // across the solid RIGHT bound → departs
 
   LaneFollowingConfig config;
   config.enable_virtual_boundary_exemption = false;
-  LaneFollowingChecker checker_no_virtual(config);
+  const auto checker_no_virtual = make_checker(config);
   EXPECT_TRUE(departed(checker_no_virtual, tracker, {5.0, 3.0}));  // exemption off → departs
 }
 
@@ -259,7 +265,7 @@ TEST(LaneFollowingTest, beyond_the_lane_end_the_virtual_boundary_does_not_exempt
     tracker.update(test_maps::make_input({id}, 5.0, 0.0, 0, test_maps::ms(0)));
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;  // default: virtual-boundary exemption on
+  const auto checker = make_checker();  // default: virtual-boundary exemption on
   // 5 m past the x=10 end and 5 m to the left: off the end of the lane, not across its left bound.
   EXPECT_TRUE(departed(checker, tracker, {15.0, 5.0}));
   // Same longitudinal position, on the solid side: departs as well.
@@ -301,7 +307,7 @@ TEST(LaneFollowingMapTest, logged_false_positive_positions_are_following)
 
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
 
   const std::vector<Scenario> scenarios = {
     {"case1 (log reference lane=52)",
@@ -367,14 +373,14 @@ TEST(LaneFollowingMapTest, connected_sequence_spans_multiple_hops)
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, 47);
   tracker.hold_reference_lane();
 
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
   EXPECT_TRUE(check_following(checker, tracker, point_in_51).is_following);  // sequence reaches 51
 
   LaneFollowingConfig config;
   config.connected_sequence_length_m = 1.0;
   config.enable_turn_lane_exemption = false;
   config.enable_virtual_boundary_exemption = false;
-  LaneFollowingChecker short_checker(config);
+  const auto short_checker = make_checker(config);
   EXPECT_FALSE(
     check_following(short_checker, tracker, point_in_51).is_following);  // 51 unreachable
 }
@@ -387,7 +393,7 @@ TEST(LaneFollowingMapTest, off_route_parallel_corridor_is_following)
 
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
 
   const auto point_in_1169 = centerline_point(map, 1169);
   const auto point_in_52 = centerline_point(map, 52);
@@ -412,7 +418,7 @@ TEST(LaneFollowingMapTest, off_route_parallel_non_turn_lane_is_following)
 
   LaneTracker tracker;
   ASSERT_TRUE(tracker.set_lanelet_map(map).has_value());
-  LaneFollowingChecker checker;
+  const auto checker = make_checker();
 
   const auto point_in_52 = centerline_point(map, 52);
 

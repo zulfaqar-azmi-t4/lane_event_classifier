@@ -17,28 +17,14 @@
 
 #include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
-#include <lane_event_classifier/lane_event_classifier_parameters.hpp>
+#include <lane_event_classifier/lane_following/geometry.hpp>
 
-#include <lanelet2_core/LaneletMap.h>
 #include <lanelet2_core/primitives/Lanelet.h>
-#include <lanelet2_routing/RoutingGraph.h>
 
-#include <string_view>
+#include <utility>
 
 namespace lane_event_classifier
 {
-using LaneFollowingConfig = ::lane_event_classifier::Params::LaneFollowing;
-
-/** @brief Which rule decided the lane-following outcome (debug tracing / logging only). */
-enum class LaneFollowingReason {
-  no_reference_lane,          // no reference lane yet -> treated as following
-  inside_connected_sequence,  // reference point inside a lane of the connected sequence
-  within_lateral_tolerance,   // reference point within the lateral margin of the sequence
-  road_shoulder_exempt,       // reference point overlaps a road shoulder
-  turn_lane_exempt,           // reference_lane / current lane is a turn / intersection lane
-  virtual_boundary_exempt,    // the boundary the ego crossed is virtual
-  departed                    // none matched -> a real lateral departure (not following)
-};
 
 /** @brief Lane-following verdict plus the rule that decided it. */
 struct LaneFollowingResult
@@ -47,15 +33,12 @@ struct LaneFollowingResult
   LaneFollowingReason debug_reason{LaneFollowingReason::no_reference_lane};
 };
 
-/** @brief Returns a short label for the reason (debug tracing / logging only). */
-[[nodiscard]] std::string_view to_debug_string(LaneFollowingReason reason);
-
 /** @brief Runs the lane-following check and reports the deciding rule (docs/lane_following.md). */
 class LaneFollowingChecker
 {
 public:
   LaneFollowingChecker() = default;
-  explicit LaneFollowingChecker(LaneFollowingConfig config);
+  LaneFollowingChecker(LaneFollowingConfig config, LaneFollowingGeometry geometry);
 
   /** @brief Runs the check for the ego reference point against the reference lane. */
   [[nodiscard]] LaneFollowingResult evaluate(
@@ -64,6 +47,7 @@ public:
 
 private:
   LaneFollowingConfig config_{};
+  LaneFollowingGeometry geometry_;  // membership test and exemption ladder (injected)
 };
 
 }  // namespace lane_event_classifier

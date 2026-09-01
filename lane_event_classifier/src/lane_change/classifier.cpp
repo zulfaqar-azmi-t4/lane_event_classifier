@@ -18,13 +18,14 @@
 #include <fmt/format.h>
 
 #include <optional>
+#include <utility>
 
 namespace lane_event_classifier
 {
 
 LaneChangeClassifier::LaneChangeClassifier(
-  bool enabled, LaneChangeConfig config, const LaneTracker & tracker)
-: enabled_{enabled}, config_{config}, tracker_{tracker}, geometry_{config.crossing_look_ahead_m}
+  bool enabled, LaneChangeConfig config, const LaneTracker & tracker, LaneChangeGeometry geometry)
+: enabled_{enabled}, config_{config}, tracker_{tracker}, geometry_{std::move(geometry)}
 {
 }
 
