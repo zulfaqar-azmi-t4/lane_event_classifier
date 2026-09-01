@@ -79,29 +79,33 @@ private:
     std::string debug_diagnostic;
   };
 
+  /** @brief One cycle's crossing-detection inputs, gathered once by observe(). */
+  struct CrossingRequest
+  {
+    const lanelet::ConstLanelet & reference_lane;
+    // Forward trajectory samples over the planned arc length.
+    const std::vector<lanelet::BasicPoint2d> & trajectory_points;
+    // Ego footprint corners in the map frame (the physical body this cycle).
+    const std::vector<lanelet::BasicPoint2d> & footprint;
+    // Objects the ego might cross to avoid; onset requires at least one.
+    const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses;
+    // Forward length the lane-sequence boundary is built to.
+    double boundary_look_ahead_m{0.0};
+  };
+
   /** @brief The valid lane-crossing crossing over the reference boundary (with its diagnostic).
    * Two sources, both gated on a candidate object to go around: (a) predictive - the planned
    * trajectory departs the lane sequence around the object (crosses a boundary out before it, back
    * in after it), detected while the ego body is still inside the lane; (b) physical - the current
    * ego footprint (the real body, so a yawed corner poking over the line counts) crosses the
    * boundary into a lane outside the sequence. A path that stays in the neighbour (never returns)
-   * is left to the lane-change classifier.
-   * @param reference_lane The tracker's current reference lanelet.
-   * @param sequence_ids The reference lane's straight sequence (fore/aft) within the look-ahead.
-   * @param trajectory_points Forward trajectory samples (computed once per cycle by observe).
-   * @param footprint The ego footprint corners in the map frame (the physical body this cycle).
-   * @param footprint_ids Lanes the footprint touches (computed once per cycle by observe).
-   * @param candidate_object_poses Objects the ego might cross to avoid; onset requires one.
-   * @param boundary_look_ahead_m Forward length the lane-sequence boundary is built to (the planned
-   * trajectory's own arc length when available; a fallback otherwise). */
+   * is left to the lane-change classifier. See docs/lane_crossing.md.
+   * @param tracker Generic lane queries.
+   * @param context Reference-lane geometry derived once for this cycle.
+   * @param request This cycle's crossing-detection inputs. */
   [[nodiscard]] CrossingResult compute_crossing(
-    const LaneTracker & tracker, const lanelet::ConstLanelet & reference_lane,
-    const std::unordered_set<lanelet::Id> & sequence_ids,
-    const std::vector<lanelet::BasicPoint2d> & trajectory_points,
-    const std::vector<lanelet::BasicPoint2d> & footprint,
-    const std::vector<lanelet::Id> & footprint_ids,
-    const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses,
-    double boundary_look_ahead_m) const;
+    const LaneTracker & tracker, const LaneEventContext & context,
+    const CrossingRequest & request) const;
 
   /** @brief True when the footprint is fully inside a lane of the reference straight sequence.
    * @param footprint_ids Lanes the footprint touches (computed once per cycle by observe). */
