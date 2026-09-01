@@ -249,7 +249,8 @@ public:
   std::optional<uint8_t> step(const LaneEventInput & input)
   {
     [[maybe_unused]] const auto update_result = tracker_.update(input);
-    classifier_.update(input);
+    context_.update(tracker_, input);
+    classifier_.update(input, context_);
     const auto state = classifier_.get_state();
     const bool is_active = state == DS::INTENTIONAL_LANE_CROSSING;
     if (is_active && !tracker_.is_reference_lane_held()) {
@@ -269,6 +270,7 @@ public:
 
 private:
   LaneTracker tracker_;
+  LaneEventContext context_;
   IntentionalCrossingClassifier classifier_;
 };
 

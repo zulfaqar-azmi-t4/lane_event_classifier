@@ -40,7 +40,7 @@ public:
   IntentionalCrossingClassifier(
     bool enabled, LaneCrossingConfig config, const LaneTracker & tracker,
     LaneCrossingGeometry geometry, LaneCrossingObjects objects);
-  void update(const LaneEventInput & input) final;
+  void update(const LaneEventInput & input, const LaneEventContext & context) final;
   [[nodiscard]] std::optional<uint8_t> get_state() const final;
   [[nodiscard]] bool is_enabled() const final;
   [[nodiscard]] std::string name() const final { return "lane_crossing"; }

@@ -78,15 +78,15 @@ LaneChangeGeometry::LaneChangeGeometry(double crossing_look_ahead_m)
 }
 
 LaneChangeObservation LaneChangeGeometry::observe(
-  const LaneTracker & tracker, const LaneEventInput & input) const
+  const LaneTracker & tracker, const LaneEventInput & input, const LaneEventContext & context) const
 {
   // Compute the two per-cycle intermediates once and share them across the helpers below.
   const auto trajectory_points =
     forward_trajectory_points_from_input(input, crossing_look_ahead_m_);
-  const auto footprint_ids = tracker.footprint_lane_ids(input.footprint);
+  const auto & footprint_ids = context.footprint_lane_ids();
 
   LaneChangeObservation observation;
-  observation.crossing = compute_crossing(tracker, input, trajectory_points);
+  observation.crossing = compute_crossing(tracker, input, context, trajectory_points);
   observation.trajectory_returns_to_reference = compute_trajectory_returns_to_reference(
     tracker, observation.crossing.has_value(), trajectory_points);
   observation.is_footprint_off_route_primitives =
@@ -98,7 +98,7 @@ LaneChangeObservation LaneChangeGeometry::observe(
 }
 
 std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
-  const LaneTracker & tracker, const LaneEventInput & input,
+  const LaneTracker & tracker, const LaneEventInput & input, const LaneEventContext & context,
   const std::vector<lanelet::BasicPoint2d> & trajectory_points) const
 {
   if (trajectory_points.empty() || !input.route_ptr) {
@@ -124,8 +124,7 @@ std::optional<LaneChangeCrossing> LaneChangeGeometry::compute_crossing(
     return std::nullopt;
   }
 
-  const auto & lane_sequence =
-    lane_sequence_cache_.get(reference_lane, tracker.routing_graph_ptr(), crossing_look_ahead_m_);
+  const auto & lane_sequence = context.sequence_ids(crossing_look_ahead_m_);
 
   const auto [target_lane_id, crossing_point] =
     scan_trajectory_for_crossing(tracker, lane_sequence, trajectory_points);

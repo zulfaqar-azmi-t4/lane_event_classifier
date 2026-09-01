@@ -423,7 +423,7 @@ LaneCrossingGeometry::LaneCrossingGeometry(
 }
 
 LaneCrossingObservation LaneCrossingGeometry::observe(
-  const LaneTracker & tracker, const LaneEventInput & input,
+  const LaneTracker & tracker, const LaneEventInput & input, const LaneEventContext & context,
   const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses) const
 {
   LaneCrossingObservation observation;
@@ -441,9 +441,8 @@ LaneCrossingObservation LaneCrossingGeometry::observe(
     forward_trajectory_points_from_input(input, std::numeric_limits<double>::max());
   const double boundary_look_ahead_m =
     trajectory_points.size() >= 2 ? polyline_arc_length(trajectory_points) : crossing_look_ahead_m_;
-  const auto footprint_ids = tracker.footprint_lane_ids(input.footprint);
-  const auto & sequence_ids = lane_sequence_cache_.get(
-    *reference_lane_opt, tracker.routing_graph_ptr(), crossing_look_ahead_m_);
+  const auto & footprint_ids = context.footprint_lane_ids();
+  const auto & sequence_ids = context.sequence_ids(crossing_look_ahead_m_);
 
   observation.is_on_route_straight = driving_straight_stays_on_route(tracker, reference_lane_id);
   auto crossing_result = compute_crossing(

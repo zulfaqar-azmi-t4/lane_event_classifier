@@ -61,10 +61,10 @@ bool LaneChangeClassifier::has_confidence_signal(
          is_blinker_toward_side(crossing.is_to_left, input.turn_indicator);
 }
 
-void LaneChangeClassifier::update(const LaneEventInput & input)
+void LaneChangeClassifier::update(const LaneEventInput & input, const LaneEventContext & context)
 {
   const double now_s = stamp_to_seconds(input);
-  const LaneChangeObservation observation = geometry_.observe(tracker_, input);
+  const LaneChangeObservation observation = geometry_.observe(tracker_, input, context);
 
   switch (phase_) {
     case Phase::idle:

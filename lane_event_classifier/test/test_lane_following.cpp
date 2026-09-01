@@ -38,7 +38,9 @@ LaneFollowingResult check_following(
   const LaneFollowingChecker & checker, const LaneTracker & tracker,
   const lanelet::BasicPoint2d & ego_point)
 {
-  return checker.evaluate(tracker, ego_point);
+  LaneEventContext context;
+  context.update(tracker, LaneEventInput{});
+  return checker.evaluate(tracker, context, ego_point);
 }
 
 // Departure onset is simply "not lane following" for the ego reference point.

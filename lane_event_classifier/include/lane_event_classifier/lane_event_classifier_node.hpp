@@ -20,6 +20,7 @@
 #include <lane_event_classifier/debug.hpp>
 #include <lane_event_classifier/detail/debounced_signal.hpp>
 #include <lane_event_classifier/detail/geometry_utils.hpp>
+#include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_change/classifier.hpp>
 #include <lane_event_classifier/lane_crossing/classifier.hpp>
@@ -97,6 +98,9 @@ private:
   // Internal state passed to classifiers each cycle
   LaneEventInput input_;
   LaneTracker lane_tracker_;
+
+  // Reference-lane geometry derived once per cycle and shared by every consumer.
+  LaneEventContext context_;
 
   // Lane-following check — evaluated outside any classifier and reported with the state.
   LaneFollowingChecker lane_following_checker_;

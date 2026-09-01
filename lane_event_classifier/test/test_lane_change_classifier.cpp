@@ -147,7 +147,8 @@ public:
   std::optional<uint8_t> step(const LaneEventInput & input)
   {
     [[maybe_unused]] const auto update_result = tracker_.update(input);
-    classifier_.update(input);
+    context_.update(tracker_, input);
+    classifier_.update(input, context_);
     const auto state = classifier_.get_state();
     const bool is_active = state == DS::LANE_CHANGING || state == DS::ABORTING_LANE_CHANGE;
     if (is_active && !tracker_.is_reference_lane_held()) {
@@ -165,6 +166,7 @@ public:
 
 private:
   LaneTracker tracker_;
+  LaneEventContext context_;
   LaneChangeClassifier classifier_;
 };
 
@@ -312,7 +314,9 @@ TEST(LaneChangeTest, double_left_change_targets_the_route_primitive)
   ASSERT_EQ(tracker.reference_lane().reference_lane_id, 50);
 
   const LaneChangeGeometry geometry{make_config().crossing_look_ahead_m};
-  const auto observation = geometry.observe(tracker, input);
+  LaneEventContext context;
+  context.update(tracker, input);
+  const auto observation = geometry.observe(tracker, input, context);
   ASSERT_TRUE(observation.crossing.has_value());
   EXPECT_EQ(observation.crossing->target_lane_id, 47);
 }

@@ -15,6 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_EVENT_CLASSIFIER_BASE_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_EVENT_CLASSIFIER_BASE_HPP_
 
+#include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/types.hpp>
 
 #include <cstdint>
@@ -33,8 +34,9 @@ public:
   /**
    * @brief Updates the classifier with the latest cycle's input.
    * @param input Per-cycle subscribed inputs and footprint.
+   * @param context Reference-lane geometry derived once for this cycle.
    */
-  virtual void update(const LaneEventInput & input) = 0;
+  virtual void update(const LaneEventInput & input, const LaneEventContext & context) = 0;
 
   /** @brief Returns this classifier's DrivingState, or nullopt when it claims no event. */
   [[nodiscard]] virtual std::optional<uint8_t> get_state() const = 0;

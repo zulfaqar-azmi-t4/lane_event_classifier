@@ -216,12 +216,13 @@ void LaneEventClassifierNode::on_trajectory(
   if (const auto tracker_updated = lane_tracker_.update(input_); !tracker_updated) {
     debug_.log_warn(tracker_updated.error());
   }
+  context_.update(lane_tracker_, input_);
   const double lane_tracker_time_ms = stop_watch.toc("lane_tracker");
 
   const auto & ego_position = input_.odometry_ptr->pose.pose.position;
   stop_watch.tic("lane_following");
   const auto lane_following_result =
-    lane_following_checker_.evaluate(lane_tracker_, {ego_position.x, ego_position.y});
+    lane_following_checker_.evaluate(lane_tracker_, context_, {ego_position.x, ego_position.y});
   const double lane_following_time_ms = stop_watch.toc("lane_following");
 
   uint8_t current_state_val = DrivingState::LANE_FOLLOWING;
@@ -233,7 +234,7 @@ void LaneEventClassifierNode::on_trajectory(
       continue;
     }
     stop_watch.tic(classifier->name());
-    classifier->update(input_);
+    classifier->update(input_, context_);
     classifier_processing_times_ms.emplace_back(
       classifier->name(), stop_watch.toc(classifier->name()));
     const auto candidate_state = classifier->get_state();

@@ -15,6 +15,7 @@ ament_auto_add_library(${PROJECT_NAME}_lib SHARED
   src/lane_event_classifier_node.cpp
   src/debug.cpp
   src/detail/lane_tracker.cpp
+  src/detail/lane_event_context.cpp
   src/lane_following/checker.cpp
   src/lane_change/geometry.cpp
   src/lane_change/classifier.cpp

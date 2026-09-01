@@ -15,7 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CHANGE__GEOMETRY_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CHANGE__GEOMETRY_HPP_
 
-#include <lane_event_classifier/detail/lane_sequence.hpp>
+#include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
 
@@ -58,13 +58,14 @@ public:
 
   /** @brief Builds the observation for this cycle from the tracker's (already refreshed) state. */
   [[nodiscard]] LaneChangeObservation observe(
-    const LaneTracker & tracker, const LaneEventInput & input) const;
+    const LaneTracker & tracker, const LaneEventInput & input,
+    const LaneEventContext & context) const;
 
 private:
   /** @brief The valid lane-change crossing of the trajectory over the reference boundary, if any.
    * @param trajectory_points Forward trajectory samples (computed once per cycle by observe). */
   [[nodiscard]] std::optional<LaneChangeCrossing> compute_crossing(
-    const LaneTracker & tracker, const LaneEventInput & input,
+    const LaneTracker & tracker, const LaneEventInput & input, const LaneEventContext & context,
     const std::vector<lanelet::BasicPoint2d> & trajectory_points) const;
 
   /** @brief True when the trajectory heads back into the reference lane (abort observation).
@@ -89,8 +90,6 @@ private:
     const std::vector<lanelet::Id> & footprint_ids);
 
   double crossing_look_ahead_m_;  // arc length ahead scanned for a trajectory crossing
-
-  mutable StraightLaneSequenceCache lane_sequence_cache_;
 };
 
 }  // namespace lane_event_classifier

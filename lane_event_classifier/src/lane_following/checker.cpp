@@ -142,7 +142,8 @@ LaneFollowingChecker::LaneFollowingChecker(LaneFollowingConfig config) : config_
 }
 
 LaneFollowingResult LaneFollowingChecker::evaluate(
-  const LaneTracker & tracker, const lanelet::BasicPoint2d & ego_point) const
+  const LaneTracker & tracker, const LaneEventContext & context,
+  const lanelet::BasicPoint2d & ego_point) const
 {
   const auto & lanelet_map_ptr = tracker.lanelet_map_ptr();
   // Attribute flags were resolved by the tracker when it anchored onto the reference lane.
@@ -153,9 +154,7 @@ LaneFollowingResult LaneFollowingChecker::evaluate(
   if (!reference_lane_opt) {
     return {true, LaneFollowingReason::no_reference_lane};
   }
-  const auto & reference_lane = *reference_lane_opt;
-  const auto & sequence_ids = lane_sequence_cache_.get(
-    reference_lane, tracker.routing_graph_ptr(), config_.connected_sequence_length_m);
+  const auto & sequence_ids = context.sequence_ids(config_.connected_sequence_length_m);
 
   // inside_connected_sequence (docs/lane_following.md, "Inside the connected sequence").
   if (is_point_inside_any(lanelet_map_ptr, sequence_ids, ego_point)) {

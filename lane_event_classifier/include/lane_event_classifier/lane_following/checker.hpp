@@ -15,7 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_FOLLOWING__CHECKER_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_FOLLOWING__CHECKER_HPP_
 
-#include <lane_event_classifier/detail/lane_sequence.hpp>
+#include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/lane_event_classifier_parameters.hpp>
 
@@ -59,12 +59,11 @@ public:
 
   /** @brief Runs the check for the ego reference point against the reference lane. */
   [[nodiscard]] LaneFollowingResult evaluate(
-    const LaneTracker & tracker, const lanelet::BasicPoint2d & ego_point) const;
+    const LaneTracker & tracker, const LaneEventContext & context,
+    const lanelet::BasicPoint2d & ego_point) const;
 
 private:
   LaneFollowingConfig config_{};
-
-  mutable StraightLaneSequenceCache lane_sequence_cache_;
 };
 
 }  // namespace lane_event_classifier

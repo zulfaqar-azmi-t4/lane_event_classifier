@@ -86,13 +86,15 @@ IntentionalCrossingClassifier::effective_candidate_object_poses(
   return {};
 }
 
-void IntentionalCrossingClassifier::update(const LaneEventInput & input)
+void IntentionalCrossingClassifier::update(
+  const LaneEventInput & input, const LaneEventContext & context)
 {
   const double now_s = stamp_to_seconds(input);
   const LaneCrossingObjects::Result objects = objects_.observe(tracker_, input);
   const auto candidate_poses =
     effective_candidate_object_poses(objects.candidate_object_poses, now_s);
-  const LaneCrossingObservation observation = geometry_.observe(tracker_, input, candidate_poses);
+  const LaneCrossingObservation observation =
+    geometry_.observe(tracker_, input, context, candidate_poses);
 
   switch (phase_) {
     case Phase::idle:

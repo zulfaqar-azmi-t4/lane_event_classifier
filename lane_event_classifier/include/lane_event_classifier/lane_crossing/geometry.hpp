@@ -15,7 +15,7 @@
 #ifndef LANE_EVENT_CLASSIFIER__LANE_CROSSING__GEOMETRY_HPP_
 #define LANE_EVENT_CLASSIFIER__LANE_CROSSING__GEOMETRY_HPP_
 
-#include <lane_event_classifier/detail/lane_sequence.hpp>
+#include <lane_event_classifier/detail/lane_event_context.hpp>
 #include <lane_event_classifier/detail/lane_tracker.hpp>
 #include <lane_event_classifier/types.hpp>
 
@@ -68,7 +68,7 @@ public:
    * @param candidate_object_poses Objects the ego might cross to avoid (from LaneCrossingObjects):
    * onset fires only when the trajectory brackets one of them. */
   [[nodiscard]] LaneCrossingObservation observe(
-    const LaneTracker & tracker, const LaneEventInput & input,
+    const LaneTracker & tracker, const LaneEventInput & input, const LaneEventContext & context,
     const std::vector<geometry_msgs::msg::Pose> & candidate_object_poses) const;
 
 private:
@@ -125,8 +125,6 @@ private:
   double predictive_lateral_trigger_distance_m_;
   // Max distance from the poking footprint corner to the candidate object it dodges.
   double footprint_crossing_object_proximity_m_;
-
-  mutable StraightLaneSequenceCache lane_sequence_cache_;
 };
 
 }  // namespace lane_event_classifier
