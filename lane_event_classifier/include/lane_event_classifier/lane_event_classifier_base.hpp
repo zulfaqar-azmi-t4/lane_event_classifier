@@ -38,7 +38,13 @@ public:
    */
   virtual void update(const LaneEventInput & input, const LaneEventContext & context) = 0;
 
-  /** @brief Returns this classifier's DrivingState, or nullopt when it claims no event. */
+  /**
+   * @brief Returns this classifier's DrivingState, or nullopt when it claims no event.
+   *
+   * Reporting a state also freezes the tracker's reference lane: the node holds it while any
+   * classifier reports and releases it when none does. Every classifier therefore observes a
+   * reference lane that any other classifier's event can pin.
+   */
   [[nodiscard]] virtual std::optional<uint8_t> get_state() const = 0;
 
   /** @brief Returns whether this classifier is enabled. */

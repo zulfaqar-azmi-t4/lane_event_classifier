@@ -53,6 +53,23 @@ tl::expected<void, std::string> LaneTracker::set_lanelet_map(
   return {};
 }
 
+void LaneTracker::apply_reference_lane_hold(bool is_hold_requested)
+{
+  if (is_hold_requested && !is_reference_lane_held_) {
+    is_reference_lane_held_ = true;
+    return;
+  }
+  if (!is_reference_lane_held_) {
+    return;
+  }
+  // A held shoulder or intersection lane always thaws (README.md, "Holding the reference lane").
+  const bool must_release = !is_hold_requested || reference_lane_.is_reference_lane_road_shoulder ||
+                            reference_lane_.is_reference_lane_intersection;
+  if (must_release) {
+    release_reference_lane();
+  }
+}
+
 void LaneTracker::release_reference_lane()
 {
   is_reference_lane_held_ = false;

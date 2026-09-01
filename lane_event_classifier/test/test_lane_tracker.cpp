@@ -34,6 +34,7 @@ using test_maps::make_input;
 using test_maps::make_next_lane_map;
 using test_maps::make_parallel_map;
 using test_maps::make_single_lane_map;
+using test_maps::make_turn_lane_map;
 
 // A lane id that no synthetic map ever mints, for the "unknown id" queries.
 constexpr lanelet::Id kUnknownLaneId = 999999;
@@ -156,6 +157,57 @@ TEST(LaneTrackerTest, hold_freezes_reference_until_released)
   [[maybe_unused]] const auto update_result_3 =
     tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 2, 0));
   EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_b);
+}
+
+// The hold policy the node applies each cycle: freeze while an event runs, thaw when none does.
+TEST(LaneTrackerTest, apply_hold_freezes_while_requested_and_thaws_when_not)
+{
+  lanelet::Id id_a = lanelet::InvalId;
+  lanelet::Id id_b = lanelet::InvalId;
+  LaneTracker tracker;
+  ASSERT_TRUE(tracker.set_lanelet_map(make_next_lane_map(id_a, id_b)).has_value());
+
+  [[maybe_unused]] const auto update_result =
+    tracker.update(make_input({id_a, id_b}, 5.0, 0.0, 0, 0));
+  ASSERT_EQ(tracker.reference_lane().reference_lane_id, id_a);
+
+  // No event requested, so nothing is held.
+  tracker.apply_reference_lane_hold(false);
+  EXPECT_FALSE(tracker.is_reference_lane_held());
+
+  // An event begins and the reference lane freezes.
+  tracker.apply_reference_lane_hold(true);
+  EXPECT_TRUE(tracker.is_reference_lane_held());
+
+  // The event continues, so the hold stays.
+  tracker.apply_reference_lane_hold(true);
+  EXPECT_TRUE(tracker.is_reference_lane_held());
+
+  // The event ends and the hold is released, so the next update re-anchors.
+  tracker.apply_reference_lane_hold(false);
+  EXPECT_FALSE(tracker.is_reference_lane_held());
+  [[maybe_unused]] const auto update_result_2 =
+    tracker.update(make_input({id_a, id_b}, 15.0, 0.0, 1, 0));
+  EXPECT_EQ(tracker.reference_lane().reference_lane_id, id_b);
+}
+
+// A held turn / intersection reference lane thaws even while an event is still requested.
+TEST(LaneTrackerTest, apply_hold_releases_a_held_turn_lane)
+{
+  lanelet::Id lane_id = lanelet::InvalId;
+  LaneTracker tracker;
+  ASSERT_TRUE(tracker.set_lanelet_map(make_turn_lane_map(lane_id)).has_value());
+
+  [[maybe_unused]] const auto update_result = tracker.update(make_input({lane_id}, 5.0, 0.0, 0, 0));
+  ASSERT_EQ(tracker.reference_lane().reference_lane_id, lane_id);
+  ASSERT_TRUE(tracker.reference_lane().is_reference_lane_intersection);
+
+  tracker.apply_reference_lane_hold(true);
+  ASSERT_TRUE(tracker.is_reference_lane_held());
+
+  // Still requested, but a turn lane never stays frozen.
+  tracker.apply_reference_lane_hold(true);
+  EXPECT_FALSE(tracker.is_reference_lane_held());
 }
 
 // Regression: releasing the hold must re-anchor the reference to the parallel lane.

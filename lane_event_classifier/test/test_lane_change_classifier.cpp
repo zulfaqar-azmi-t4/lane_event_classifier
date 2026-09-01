@@ -151,11 +151,7 @@ public:
     classifier_.update(input, context_);
     const auto state = classifier_.get_state();
     const bool is_active = state == DS::LANE_CHANGING || state == DS::ABORTING_LANE_CHANGE;
-    if (is_active && !tracker_.is_reference_lane_held()) {
-      tracker_.hold_reference_lane();
-    } else if (!is_active && tracker_.is_reference_lane_held()) {
-      tracker_.release_reference_lane();
-    }
+    tracker_.apply_reference_lane_hold(is_active);
     return state;
   }
 

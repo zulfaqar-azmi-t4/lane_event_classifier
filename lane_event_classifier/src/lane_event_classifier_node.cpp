@@ -260,15 +260,7 @@ void LaneEventClassifierNode::on_trajectory(
   pub_driving_factor_->publish(out);
 
   // Freeze the reference lane while an event runs (README.md, "Holding the reference lane").
-  const auto & ref_lane = lane_tracker_.reference_lane();
-  if (is_any_event_active && !lane_tracker_.is_reference_lane_held()) {
-    lane_tracker_.hold_reference_lane();
-  } else if (
-    (!is_any_event_active || ref_lane.is_reference_lane_road_shoulder ||
-     ref_lane.is_reference_lane_intersection) &&
-    lane_tracker_.is_reference_lane_held()) {
-    lane_tracker_.release_reference_lane();
-  }
+  lane_tracker_.apply_reference_lane_hold(is_any_event_active);
 
   const double total_time_ms = stop_watch.toc();
 

@@ -70,6 +70,12 @@ public:
 
   void release_reference_lane();
 
+  /**
+   * @brief Applies this cycle's hold policy to the reference lane.
+   * @param is_hold_requested Whether any classifier is reporting an event this cycle.
+   */
+  void apply_reference_lane_hold(bool is_hold_requested);
+
   [[nodiscard]] bool is_reference_lane_held() const { return is_reference_lane_held_; }
 
   [[nodiscard]] const ReferenceLane & reference_lane() const { return reference_lane_; }
