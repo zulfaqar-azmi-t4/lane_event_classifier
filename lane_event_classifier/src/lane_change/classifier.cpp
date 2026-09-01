@@ -17,6 +17,8 @@
 
 #include <fmt/format.h>
 
+#include <optional>
+
 namespace lane_event_classifier
 {
 
@@ -156,7 +158,7 @@ void LaneChangeClassifier::detect_abort_completion_or_recommit(
   }
 }
 
-uint8_t LaneChangeClassifier::get_state() const
+std::optional<uint8_t> LaneChangeClassifier::get_state() const
 {
   switch (phase_) {
     case Phase::changing:
@@ -165,8 +167,8 @@ uint8_t LaneChangeClassifier::get_state() const
       return DrivingState::ABORTING_LANE_CHANGE;
     case Phase::idle:
     default:
-      // No lane-change event: UNKNOWN (the node falls back to the lane-following gate).
-      return DrivingState::UNKNOWN;
+      // No lane-change event; the node falls back to the lane-following check.
+      return std::nullopt;
   }
 }
 

@@ -37,8 +37,7 @@ across the package. The terms below are specific to intentional crossing.
 ## How the classifier decides
 
 The classifier is a state machine with two phases. Each phase maps to one reported result. Abort is
-not modelled in this pass (see the design notes), so there is no
-`ABORTING_INTENTIONAL_LANE_CROSSING` edge.
+not modelled in this pass (see the design notes), so a crossing has no abort edge.
 
 ```mermaid
 stateDiagram-v2

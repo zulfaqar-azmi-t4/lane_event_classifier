@@ -17,6 +17,7 @@
 
 #include <fmt/format.h>
 
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -151,15 +152,15 @@ void IntentionalCrossingClassifier::detect_completion(
   // Otherwise straddling: not fully inside any lane yet, so hold the crossing.
 }
 
-uint8_t IntentionalCrossingClassifier::get_state() const
+std::optional<uint8_t> IntentionalCrossingClassifier::get_state() const
 {
   switch (phase_) {
     case Phase::crossing:
       return DrivingState::INTENTIONAL_LANE_CROSSING;
     case Phase::idle:
     default:
-      // No crossing event: UNKNOWN (the node falls back to the lane-following check).
-      return DrivingState::UNKNOWN;
+      // No crossing event; the node falls back to the lane-following check.
+      return std::nullopt;
   }
 }
 

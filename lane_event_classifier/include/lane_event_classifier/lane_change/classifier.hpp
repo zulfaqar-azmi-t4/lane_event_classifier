@@ -22,6 +22,7 @@
 #include <lane_event_classifier/lane_event_classifier_parameters.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace lane_event_classifier
@@ -34,7 +35,7 @@ class LaneChangeClassifier : public LaneEventClassifierBase
 public:
   LaneChangeClassifier(bool enabled, LaneChangeConfig config, const LaneTracker & tracker);
   void update(const LaneEventInput & input) final;
-  [[nodiscard]] uint8_t get_state() const final;
+  [[nodiscard]] std::optional<uint8_t> get_state() const final;
   [[nodiscard]] bool is_enabled() const final;
   [[nodiscard]] std::string name() const final { return "lane_change"; }
   [[nodiscard]] std::string debug_reason() const final { return debug_reason_; }

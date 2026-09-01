@@ -43,10 +43,10 @@ StateStyle style_for_state(uint8_t state)
       return {"ABORTING LANE CHANGE", "#C62828"};
     case DrivingState::INTENTIONAL_LANE_CROSSING:
       return {"INTENTIONAL CROSSING", "#1565C0"};
-    case DrivingState::ABORTING_INTENTIONAL_LANE_CROSSING:
-      return {"ABORTING CROSSING", "#BF360C"};
-    default:  // UNKNOWN
-      return {"UNKNOWN", "#424242"};
+    case DrivingState::UNKNOWN:
+      return {"UNKNOWN", "#6A1B9A"};
+    default:  // UNDEFINED, and any value this build does not know
+      return {"UNDEFINED", "#424242"};
   }
 }
 

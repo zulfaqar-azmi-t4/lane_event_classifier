@@ -31,6 +31,7 @@
 #include <array>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <utility>
 #include <vector>
 
@@ -143,11 +144,11 @@ public:
     EXPECT_TRUE(result.has_value());
   }
 
-  uint8_t step(const LaneEventInput & input)
+  std::optional<uint8_t> step(const LaneEventInput & input)
   {
     [[maybe_unused]] const auto update_result = tracker_.update(input);
     classifier_.update(input);
-    const uint8_t state = classifier_.get_state();
+    const auto state = classifier_.get_state();
     const bool is_active = state == DS::LANE_CHANGING || state == DS::ABORTING_LANE_CHANGE;
     if (is_active && !tracker_.is_reference_lane_held()) {
       tracker_.hold_reference_lane();
@@ -200,7 +201,7 @@ TEST(LaneChangeTest, single_left_change_onset_then_settle)
   const auto ego_in_48 = crossing_trajectory.front();
 
   // Onset: hold the crossing until LANE_CHANGING is confirmed.
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   bool became_changing = false;
   for (int cycle = 0; cycle < 10; ++cycle) {
@@ -229,7 +230,7 @@ TEST(LaneChangeTest, single_left_change_onset_then_settle)
     state = sim.step(
       test_maps::make_trajectory_input(
         route, point_in_47, sec, nsec, settle_trajectory, footprint_47));
-    if (state == DS::UNKNOWN) {
+    if (!state) {
       settled = true;
       break;
     }
@@ -250,7 +251,7 @@ TEST(LaneChangeTest, double_left_change_settles_only_at_route_primitive)
   const auto crossing_trajectory = build_lane_trajectory(map, {50, 48, 47}, 0.3, 0.9, 30);
   const auto ego_in_50 = crossing_trajectory.front();
 
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 10 && state != DS::LANE_CHANGING; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
@@ -285,7 +286,7 @@ TEST(LaneChangeTest, double_left_change_settles_only_at_route_primitive)
     state = sim.step(
       test_maps::make_trajectory_input(
         route, point_in_47, sec, nsec, settle_trajectory, footprint_47));
-    if (state == DS::UNKNOWN) {
+    if (!state) {
       settled = true;
       break;
     }
@@ -331,7 +332,7 @@ TEST(LaneChangeTest, on_route_primitive_crossing_off_route_is_not_lane_change)
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 15; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, crossing_trajectory, {ego_in_47}));
     EXPECT_NE(state, DS::LANE_CHANGING) << "crossing off-route from an on-route primitive";
@@ -351,7 +352,7 @@ TEST(LaneChangeTest, abort_when_trajectory_returns_then_geometric_completion)
   const auto crossing_trajectory = build_lane_trajectory(map, {48, 47}, 0.3, 0.9, 20);
   const auto ego_in_48 = crossing_trajectory.front();
 
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 10 && state != DS::LANE_CHANGING; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
@@ -386,7 +387,7 @@ TEST(LaneChangeTest, abort_when_trajectory_returns_then_geometric_completion)
   state = sim.step(
     test_maps::make_trajectory_input(
       route, point_in_48, sec, nsec, return_trajectory, footprint_48));
-  EXPECT_EQ(state, DS::UNKNOWN) << "abort completes geometrically with no dwell";
+  EXPECT_FALSE(state.has_value()) << "abort completes geometrically with no dwell";
 }
 
 // From ABORTING, a trajectory back toward the target returns directly to LANE_CHANGING.
@@ -402,7 +403,7 @@ TEST(LaneChangeTest, aborting_recommits_to_changing)
   const auto return_trajectory = build_lane_trajectory(map, {48}, 0.3, 0.9, 20);
   const auto ego_in_48 = crossing_trajectory.front();
 
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   auto run = [&](const std::vector<lanelet::BasicPoint2d> & trajectory, int cycles, uint8_t until) {
     for (int cycle = 0; cycle < cycles; ++cycle) {
@@ -442,7 +443,7 @@ TEST(LaneChangeTest, blinker_confidence_signal_shortens_onset_window)
     int64_t time_ms = 0;
     for (int cycle = 0; cycle < 20; ++cycle) {
       const auto [sec, nsec] = stamp_from_ms(time_ms);
-      const uint8_t state = sim.step(
+      const auto state = sim.step(
         test_maps::make_trajectory_input(
           route, ego_in_48, sec, nsec, crossing_trajectory, straddling_footprint, turn_indicator));
       if (state == DS::LANE_CHANGING) {
@@ -479,7 +480,7 @@ TEST(LaneChangeTest, empty_footprint_is_not_a_confidence_signal)
     int64_t time_ms = 0;
     for (int cycle = 0; cycle < 20; ++cycle) {
       const auto [sec, nsec] = stamp_from_ms(time_ms);
-      const uint8_t state = sim.step(
+      const auto state = sim.step(
         test_maps::make_trajectory_input(
           route, ego_in_48, sec, nsec, crossing_trajectory, footprint,
           TurnIndicatorsReport::DISABLE));

@@ -54,14 +54,17 @@ defines only the terms specific to it.
 
 ### Output states (`DrivingState`)
 
-| State                                | Value | Meaning                                                                             |
-| ------------------------------------ | ----- | ----------------------------------------------------------------------------------- |
-| `UNKNOWN`                            | 0     | Inputs not ready, **or** the ego left its lane but no classifier claimed the event. |
-| `LANE_FOLLOWING`                     | 1     | The ego is still in its lane and no event is active.                                |
-| `LANE_CHANGING`                      | 2     | The lane-change classifier confirmed a change in progress.                          |
-| `ABORTING_LANE_CHANGE`               | 3     | A committed lane change is reversing back to the reference lane.                    |
-| `INTENTIONAL_LANE_CROSSING`          | 4     | The intentional-crossing classifier confirmed a crossing.                           |
-| `ABORTING_INTENTIONAL_LANE_CROSSING` | 5     | A committed intentional crossing is reversing.                                      |
+| State                       | Value | Meaning                                                          |
+| --------------------------- | ----- | ---------------------------------------------------------------- |
+| `UNDEFINED`                 | 0     | An input was missing, so no classification ran this cycle.       |
+| `LANE_FOLLOWING`            | 1     | The ego is still in its lane and no event is active.             |
+| `LANE_CHANGING`             | 2     | The lane-change classifier confirmed a change in progress.       |
+| `ABORTING_LANE_CHANGE`      | 3     | A committed lane change is reversing back to the reference lane. |
+| `INTENTIONAL_LANE_CROSSING` | 4     | The intentional-crossing classifier confirmed a crossing.        |
+| `UNKNOWN`                   | 6     | The ego left its lane and no classifier claimed the event.       |
+
+Value 5 is retired. It was `ABORTING_INTENTIONAL_LANE_CROSSING`, which no classifier ever
+published.
 
 ---
 

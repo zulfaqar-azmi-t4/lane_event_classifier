@@ -203,7 +203,7 @@ void LaneEventClassifierNode::on_trajectory(
   const auto lane_event_inputs_updated = take_data(trajectory_msg);
   if (!lane_event_inputs_updated) {
     debug_.log_warn(lane_event_inputs_updated.error());
-    out.driving_state.state = DrivingState::UNKNOWN;
+    out.driving_state.state = DrivingState::UNDEFINED;
     pub_driving_factor_->publish(out);
     return;
   }
@@ -236,14 +236,12 @@ void LaneEventClassifierNode::on_trajectory(
     classifier->update(input_);
     classifier_processing_times_ms.emplace_back(
       classifier->name(), stop_watch.toc(classifier->name()));
-    const uint8_t candidate_state = classifier->get_state();
-    // Only a confirmed event counts; LANE_FOLLOWING or UNKNOWN from a classifier is no event.
-    if (
-      candidate_state == DrivingState::LANE_FOLLOWING || candidate_state == DrivingState::UNKNOWN) {
-      continue;
+    const auto candidate_state = classifier->get_state();
+    if (!candidate_state) {
+      continue;  // the classifier claims no event this cycle
     }
     if (!is_any_event_active) {
-      current_state_val = candidate_state;  // first confirmed classifier wins (priority order)
+      current_state_val = *candidate_state;  // first claiming classifier wins (priority order)
     }
     is_any_event_active = true;
   }

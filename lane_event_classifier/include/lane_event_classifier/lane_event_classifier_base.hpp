@@ -18,6 +18,7 @@
 #include <lane_event_classifier/types.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 namespace lane_event_classifier
@@ -35,8 +36,8 @@ public:
    */
   virtual void update(const LaneEventInput & input) = 0;
 
-  /** @brief Returns the current DrivingState of this classifier. */
-  [[nodiscard]] virtual uint8_t get_state() const = 0;
+  /** @brief Returns this classifier's DrivingState, or nullopt when it claims no event. */
+  [[nodiscard]] virtual std::optional<uint8_t> get_state() const = 0;
 
   /** @brief Returns whether this classifier is enabled. */
   [[nodiscard]] virtual bool is_enabled() const = 0;

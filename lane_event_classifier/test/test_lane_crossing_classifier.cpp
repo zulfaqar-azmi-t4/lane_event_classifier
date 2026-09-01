@@ -32,6 +32,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -245,11 +246,11 @@ public:
     EXPECT_TRUE(result.has_value());
   }
 
-  uint8_t step(const LaneEventInput & input)
+  std::optional<uint8_t> step(const LaneEventInput & input)
   {
     [[maybe_unused]] const auto update_result = tracker_.update(input);
     classifier_.update(input);
-    const uint8_t state = classifier_.get_state();
+    const auto state = classifier_.get_state();
     const bool is_active = state == DS::INTENTIONAL_LANE_CROSSING;
     if (is_active && !tracker_.is_reference_lane_held()) {
       tracker_.hold_reference_lane();
@@ -304,7 +305,7 @@ bool run_until_crossing(
 {
   for (int cycle = 0; cycle < max_cycles; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego, sec, nsec, trajectory, {ego}, TurnIndicatorsReport::DISABLE, objects));
     if (state == DS::INTENTIONAL_LANE_CROSSING) {
@@ -341,7 +342,7 @@ TEST(LaneCrossingTest, onset_then_return_completes)
   const auto return_trajectory = build_lane_trajectory(map, {47}, 0.5, 0.95, 20);
 
   bool completed = false;
-  uint8_t state = DS::INTENTIONAL_LANE_CROSSING;
+  std::optional<uint8_t> state = DS::INTENTIONAL_LANE_CROSSING;
   for (int cycle = 0; cycle < 12; ++cycle) {
     time_ms += 100;
     const auto [sec, nsec] = stamp_from_ms(time_ms);
@@ -349,7 +350,7 @@ TEST(LaneCrossingTest, onset_then_return_completes)
       test_maps::make_trajectory_input(
         route, point_in_47, sec, nsec, return_trajectory, footprint_47,
         TurnIndicatorsReport::DISABLE, objects));
-    if (state == DS::UNKNOWN) {
+    if (!state) {
       completed = true;
       break;
     }
@@ -375,7 +376,7 @@ TEST(LaneCrossingTest, dodge_toward_road_shoulder_is_not_a_crossing)
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 10; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, crossing_trajectory, {ego_in_47},
         TurnIndicatorsReport::DISABLE, objects));
@@ -422,7 +423,7 @@ TEST(LaneCrossingTest, no_object_is_not_a_crossing)
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 15; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, crossing_trajectory, {ego_in_47}));
     EXPECT_NE(state, DS::INTENTIONAL_LANE_CROSSING) << "no obstacle, so no intentional crossing";
@@ -448,7 +449,7 @@ TEST(LaneCrossingTest, centered_ego_far_from_boundary_does_not_predictively_onse
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 15; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_centered, sec, nsec, crossing_trajectory, {ego_centered},
         TurnIndicatorsReport::DISABLE, objects));
@@ -476,7 +477,7 @@ TEST(LaneCrossingTest, monotonic_sweep_into_neighbour_is_not_a_crossing)
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 15; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, sweep_trajectory, {ego_in_47}, TurnIndicatorsReport::DISABLE,
         objects));
@@ -553,7 +554,7 @@ TEST(LaneCrossingTest, full_entry_into_adjacent_lane_escapes)
   const auto through_48_trajectory = build_lane_trajectory(map, {48}, 0.7, 0.95, 20);
   time_ms += 100;
   const auto [sec, nsec] = stamp_from_ms(time_ms);
-  const uint8_t state = sim.step(
+  const auto state = sim.step(
     test_maps::make_trajectory_input(
       route, point_in_48, sec, nsec, through_48_trajectory, footprint_48,
       TurnIndicatorsReport::DISABLE, objects));
@@ -592,7 +593,7 @@ TEST(LaneCrossingTest, candidate_memory_bridges_perception_dropout)
   bool became_crossing = false;
   for (int cycle = 0; cycle < 6; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, crossing_trajectory, {ego_in_47},
         TurnIndicatorsReport::DISABLE, nullptr));
@@ -622,7 +623,7 @@ TEST(LaneCrossingTest, footprint_over_boundary_is_a_crossing)
   const auto objects =
     test_maps::make_objects({test_maps::make_object(object_point.x(), object_point.y())});
 
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   bool became_crossing = false;
   for (int cycle = 0; cycle < 10; ++cycle) {
@@ -660,7 +661,7 @@ TEST(LaneCrossingTest, footprint_over_boundary_with_distant_object_is_not_a_cros
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 10; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, straight_trajectory, footprint, TurnIndicatorsReport::DISABLE,
         objects));
@@ -689,7 +690,7 @@ TEST(LaneCrossingTest, slight_cornering_overhang_is_not_a_crossing)
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 15; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_47, sec, nsec, straight_trajectory, footprint, TurnIndicatorsReport::DISABLE,
         objects));
@@ -716,7 +717,7 @@ TEST(LaneCrossingTest, long_dodge_does_not_time_out)
   const auto objects =
     test_maps::make_objects({test_maps::make_object(object_point.x(), object_point.y())});
 
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   bool became_crossing = false;
   for (int cycle = 0; cycle < 10; ++cycle) {
@@ -757,7 +758,7 @@ TEST(LaneCrossingTest, long_dodge_does_not_time_out)
       test_maps::make_trajectory_input(
         route, point_in_47, sec, nsec, return_trajectory, footprint_47,
         TurnIndicatorsReport::DISABLE, objects));
-    if (state == DS::UNKNOWN) {
+    if (!state) {
       completed = true;
       break;
     }
@@ -781,7 +782,7 @@ TEST(LaneCrossingTest, object_gone_while_straddling_stays_crossing)
   const auto objects =
     test_maps::make_objects({test_maps::make_object(object_point.x(), object_point.y())});
 
-  uint8_t state = DS::UNKNOWN;
+  std::optional<uint8_t> state;
   int64_t time_ms = 0;
   bool became_crossing = false;
   for (int cycle = 0; cycle < 10; ++cycle) {
@@ -835,7 +836,7 @@ TEST(LaneCrossingTest, full_crossover_ends_even_with_object_ahead)
   const auto through_48_trajectory = build_lane_trajectory(map, {48}, 0.3, 0.8, 20);
   time_ms += 100;
   const auto [sec, nsec] = stamp_from_ms(time_ms);
-  const uint8_t state = sim.step(
+  const auto state = sim.step(
     test_maps::make_trajectory_input(
       route, point_in_48, sec, nsec, through_48_trajectory, footprint_48,
       TurnIndicatorsReport::DISABLE, objects));
@@ -861,7 +862,7 @@ TEST(LaneCrossingTest, lane_change_regime_is_not_a_crossing)
   int64_t time_ms = 0;
   for (int cycle = 0; cycle < 15; ++cycle) {
     const auto [sec, nsec] = stamp_from_ms(time_ms);
-    const uint8_t state = sim.step(
+    const auto state = sim.step(
       test_maps::make_trajectory_input(
         route, ego_in_48, sec, nsec, crossing_trajectory, {ego_in_48},
         TurnIndicatorsReport::DISABLE, objects));

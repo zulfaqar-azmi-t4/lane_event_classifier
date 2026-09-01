@@ -29,6 +29,8 @@ namespace
 const char * state_to_string(uint8_t state)
 {
   switch (state) {
+    case DrivingState::UNDEFINED:
+      return "UNDEFINED";
     case DrivingState::UNKNOWN:
       return "UNKNOWN";
     case DrivingState::LANE_FOLLOWING:
@@ -39,8 +41,6 @@ const char * state_to_string(uint8_t state)
       return "ABORTING_LANE_CHANGE";
     case DrivingState::INTENTIONAL_LANE_CROSSING:
       return "INTENTIONAL_LANE_CROSSING";
-    case DrivingState::ABORTING_INTENTIONAL_LANE_CROSSING:
-      return "ABORTING_INTENTIONAL_LANE_CROSSING";
     default:
       return "?";
   }

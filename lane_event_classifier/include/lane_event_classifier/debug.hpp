@@ -93,7 +93,7 @@ private:
   mutable lanelet::Id previous_reference_lane_id_{
     lanelet::InvalId};  // last reference lane id, to log re-anchoring
   mutable uint8_t previously_published_state_{
-    DrivingState::UNKNOWN};  // last state, to log transitions
+    DrivingState::UNDEFINED};  // last state, to log transitions
 };
 
 }  // namespace lane_event_classifier
